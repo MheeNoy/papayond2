@@ -50,6 +50,9 @@ importers:
       axios:
         specifier: ^1.7.4
         version: 1.7.4
+      basic-ftp:
+        specifier: ^5.0.5
+        version: 5.0.5
       bcrypt:
         specifier: ^5.1.1
         version: 5.1.1
@@ -1046,6 +1049,10 @@ packages:
   base64-arraybuffer@1.0.2:
     resolution: {integrity: sha512-I3yl4r9QB5ZRY3XuJVEPfc2XhZO6YweFPI+UovAzn+8/hb3oJ6lnysaFcjVpkCPfVWFUDvoZ8kmVDP7WyRtYtQ==}
     engines: {node: '>= 0.6.0'}
+
+  basic-ftp@5.0.5:
+    resolution: {integrity: sha512-4Bcg1P8xhUuqcii/S0Z9wiHIrQVPMermM1any+MX5GeGD7faD3/msQUDGLol9wOcz4/jbg/WJnGqoJF6LiBdtg==}
+    engines: {node: '>=10.0.0'}
 
   bcrypt@5.1.1:
     resolution: {integrity: sha512-AGBHOG5hPYZ5Xl9KXzU5iKq9516yEmvCKDg3ecP5kX2aB6UqTeXZxk2ELnDgDm6BQSMlLt9rDB4LoSMx0rYwww==}
@@ -4166,6 +4173,8 @@ snapshots:
 
   base64-arraybuffer@1.0.2:
     optional: true
+
+  basic-ftp@5.0.5: {}
 
   bcrypt@5.1.1:
     dependencies:
