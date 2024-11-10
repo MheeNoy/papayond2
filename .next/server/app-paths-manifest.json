@@ -1,0 +1,14 @@
+{
+  "/[...not-found]/page": "app/[...not-found]/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/university/route": "app/api/university/route.js",
+  "/api/permission/menu/route": "app/api/permission/menu/route.js",
+  "/page": "app/page.js",
+  "/(dashboard)/parcel_address/page": "app/(dashboard)/parcel_address/page.js",
+  "/(dashboard)/group_photo_report/page": "app/(dashboard)/group_photo_report/page.js",
+  "/(dashboard)/film_number_report/page": "app/(dashboard)/film_number_report/page.js",
+  "/(dashboard)/parcel_number_report/page": "app/(dashboard)/parcel_number_report/page.js",
+  "/(dashboard)/chart/page": "app/(dashboard)/chart/page.js",
+  "/(blank-layout-pages)/login/page": "app/(blank-layout-pages)/login/page.js",
+  "/(dashboard)/home/page": "app/(dashboard)/home/page.js"
+}

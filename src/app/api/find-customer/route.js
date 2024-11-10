@@ -20,31 +20,30 @@ export async function POST(request) {
 
     // ดึงข้อมูลจาก body ของคำขอ
     const body = await request.json()
-    const { film_no, uni_id } = body
+    const { film_no, uni_id } = body // รับค่า film_no และ uni_id
 
     if (!film_no || !uni_id) {
       return NextResponse.json({ error: 'Missing film_no or uni_id' }, { status: 400 })
     }
 
-    // ดึงข้อมูล fname และ lname จากตาราง address
+    // ค้นหา address_id จากตาราง address โดยใช้ film_no และ uni_id
     const [addressRows] = await connection.execute(
-      'SELECT fname, lname FROM address WHERE film_no = ? AND uni_id = ?',
+      'SELECT id, fname, lname FROM address WHERE film_no = ? AND uni_id = ?',
       [film_no, uni_id]
     )
 
     if (addressRows.length > 0) {
-      const { fname, lname } = addressRows[0]
+      const { id: address_id, fname, lname } = addressRows[0]
       const customerName = `${fname} ${lname}`
 
-      // ค้นหา booking_no ที่ตรงกับ film_no จากตาราง address_booking
-      const [bookingRows] = await connection.execute(
-        'SELECT booking_no FROM address_booking WHERE film_no = ? AND uni_id = ?',
-        [film_no, uni_id]
-      )
+      // ค้นหา booking_no จากตาราง address_booking โดยใช้ address_id
+      const [bookingRows] = await connection.execute('SELECT booking_no FROM address_booking WHERE address_id = ?', [
+        address_id
+      ])
 
       const bookingNos = bookingRows.map(row => row.booking_no) // เก็บ booking_no ทั้งหมดใน array
 
-      // ตรวจสอบว่าฟิล์มนี้มีการส่งไปก่อนหน้าใน b_bookingsend หรือไม่
+      // ตรวจสอบว่าฟิล์มนี้มีการส่งไปก่อนหน้าใน b_bookingsend หรือไม่ โดยใช้ film_no และ uni_id
       const [sendRows] = await connection.execute(
         'SELECT MAX(number_send) AS max_number_send FROM b_bookingsend WHERE film_no = ? AND uni_id = ?',
         [film_no, uni_id]
@@ -58,7 +57,7 @@ export async function POST(request) {
 
       return NextResponse.json({ customerName, bookingNos, numberSend }, { status: 200 })
     } else {
-      return NextResponse.json({ error: 'No data found' }, { status: 404 })
+      return NextResponse.json({ error: 'No data found for the provided film_no and uni_id' }, { status: 404 })
     }
   } catch (error) {
     console.error('Database error:', error)

@@ -103,6 +103,40 @@ export async function POST(request) {
         response = { success: true, exists }
         break
 
+      case 'upsert':
+        // ตรวจสอบข้อมูลที่จำเป็นสำหรับการ upsert
+        if (!booking_no || !booking_set || amount === undefined || !uni_id) {
+          return NextResponse.json({ success: false, message: 'ข้อมูลไม่ครบถ้วนสำหรับการ upsert' }, { status: 400 })
+        }
+
+        // ดำเนินการ upsert
+        const [upsertResult] = await db.execute(
+          `INSERT INTO b_bookingfw (booking_no, booking_set, amount, send_type, uni_id, orderid, add_ademgo, chang_eleph, film_no)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+           amount = VALUES(amount),
+           add_ademgo = VALUES(add_ademgo),
+           chang_eleph = VALUES(chang_eleph),
+           send_type = VALUES(send_type),
+           uni_id = VALUES(uni_id),
+           orderid = VALUES(orderid),
+           film_no = VALUES(film_no)`,
+          [
+            booking_no,
+            booking_set,
+            amount,
+            send_type || 0,
+            uni_id,
+            orderid || 0,
+            add_ademgo || 0,
+            chang_eleph || 0,
+            film_no || ''
+          ]
+        )
+
+        response = { success: true, message: 'ดำเนินการ upsert สำเร็จ' }
+        break
+
       default:
         return NextResponse.json({ success: false, message: 'การกระทำที่ระบุไม่ถูกต้อง' }, { status: 400 })
     }

@@ -1,55 +1,41 @@
+// pages/api/bookingfw.js
+
+import { NextResponse } from 'next/server'
 import mysql from 'mysql2/promise'
 
-const dbConnect = async () => {
-  return await mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
-  })
-}
-
 export async function POST(request) {
-  let connection
-
   try {
-    // เชื่อมต่อกับฐานข้อมูล
-    connection = await dbConnect()
+    const data = await request.json()
+    const { uni_id } = data
 
-    // ดึงค่า body จาก request
-    const body = await request.json()
-    const { uni_id } = body
-
+    // ตรวจสอบว่ามีการส่ง uni_id มาหรือไม่
     if (!uni_id) {
-      return new Response(JSON.stringify({ error: 'Missing uni_id in body' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return NextResponse.json({ success: false, message: 'ไม่พบ uni_id' }, { status: 400 })
     }
 
-    // ดึงข้อมูลจากตาราง address โดยกรองตาม uni_id
-    const [rows] = await connection.query(
-      'SELECT id, fname, lname, posiphoto_1, posiphoto_2, posiphoto_3, posiphoto_4, posiphoto_5, posiphoto_6, posiphoto_7, posiphoto_8, posiphoto_9, film_no, update_date, update_by FROM address WHERE uni_id = ?',
+    // สร้างการเชื่อมต่อฐานข้อมูล
+    const connection = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
+    })
+
+    // ดึงข้อมูลจากตาราง b_bookingfw โดยใช้ uni_id
+    const [rows] = await connection.execute(
+      `SELECT booking_no, booking_set, amount, send_type, add_ademgo, chang_eleph, film_no
+       FROM b_bookingfw
+       WHERE uni_id = ?`,
       [uni_id]
     )
 
-    // ปิดการเชื่อมต่อหลังจากดึงข้อมูลเสร็จ
+    // ปิดการเชื่อมต่อฐานข้อมูล
     await connection.end()
 
-    // ส่งข้อมูลกลับเป็น JSON
-    return new Response(JSON.stringify(rows), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    // ส่งข้อมูลกลับไปยังฝั่งลูกค้า
+    return NextResponse.json(rows)
   } catch (error) {
-    console.error('Error fetching address:', error.message)
-
-    // ปิดการเชื่อมต่อในกรณีที่เกิดข้อผิดพลาด
-    if (connection) await connection.end()
-
-    return new Response(JSON.stringify({ error: 'Failed to fetch addresses' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
+    console.error('Error fetching data from b_bookingfw:', error)
+    return NextResponse.json({ success: false, message: 'เกิดข้อผิดพลาดในการดึงข้อมูล' }, { status: 500 })
   }
 }
