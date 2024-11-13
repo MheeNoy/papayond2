@@ -1,0 +1,78 @@
+[33mcommit 9582f48c414be2604a877cd65fc36984eb684e13[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: Pansawut Pujaroen <66000897+Masterboom-tha@users.noreply.github.com>
+Date:   Thu Nov 14 00:13:15 2024 +0700
+
+    Update .gitignore to exclude node_modules and .next
+
+[33mcommit e5c291ae76a6a80fd3364d39bc915351b82ef264[m
+Author: Pansawut Pujaroen <66000897+Masterboom-tha@users.noreply.github.com>
+Date:   Thu Nov 14 00:10:05 2024 +0700
+
+    update api f_ and set_the_price_frame page
+
+[33mcommit 83cc7f8fd009ef16b376949d562a7c2f6f9b256b[m
+Author: Pansawut Pujaroen <66000897+Masterboom-tha@users.noreply.github.com>
+Date:   Thu Nov 14 00:06:38 2024 +0700
+
+    update api f_ and set_the_price_frame page
+
+[33mcommit f07fa06a2e926b0394d1311a9fd42abce6244b4b[m[33m ([m[1;31morigin/master[m[33m)[m
+Author: Dev-Boom <pansawut.pu@gmail.com>
+Date:   Wed Nov 13 21:21:34 2024 +0700
+
+    v3
+
+[33mcommit ba335762deb76f9d0a2c1161d0fc0cf5df52f4d9[m
+Author: Dev-Boom <pansawut.pu@gmail.com>
+Date:   Tue Nov 12 10:25:38 2024 +0700
+
+    v2.1
+
+[33mcommit 0ad2f742267bcdfc542b4e3f2cbf1ba0809a7172[m
+Merge: 80e8433 c8af3eb
+Author: Dev-Boom <pansawut.pu@gmail.com>
+Date:   Tue Nov 12 09:35:21 2024 +0700
+
+    Merge branch 'master' of https://github.com/Dev-Boom-Git/papayond2
+
+[33mcommit 80e8433361edb010b25ceff5810ec6a1aca21e2d[m
+Author: Dev-Boom <pansawut.pu@gmail.com>
+Date:   Tue Nov 12 09:35:09 2024 +0700
+
+    v2
+
+[33mcommit c8af3eba543a9af00ed760997cb429727313d7aa[m
+Author: Dev-Boom <pansawut.pu@gmail.com>
+Date:   Mon Nov 11 09:49:33 2024 +0700
+
+    Update README.md
+
+[33mcommit db27455dd874b0ab9f3b03a8cc020f5e7b7657a5[m
+Author: Dev-Boom <pansawut.pu@gmail.com>
+Date:   Mon Nov 11 09:49:16 2024 +0700
+
+    Update README.md
+
+[33mcommit dba3be195b705445f74549c964d306475f526e79[m
+Author: Pansawut Pujaroen <66000897+Masterboom-tha@users.noreply.github.com>
+Date:   Mon Nov 11 01:50:12 2024 +0700
+
+    อัพเดตโค้ด RecordParcelNumber และเพิ่ม snackbar สำหรับแจ้งเตือน
+
+[33mcommit e295bbc5f550e43f3ed64f39995d51b80e6d159d[m
+Author: Pansawut Pujaroen <66000897+Masterboom-tha@users.noreply.github.com>
+Date:   Mon Nov 11 01:48:49 2024 +0700
+
+    อัพเดตโค้ด RecordParcelNumber และเพิ่ม snackbar สำหรับแจ้งเตือนและอื่นๆเช่น
+
+[33mcommit 519150bddd2135ae3556eee3fb3942a879fb5a21[m
+Author: Pansawut Pujaroen <66000897+Masterboom-tha@users.noreply.github.com>
+Date:   Thu Nov 7 22:44:45 2024 +0700
+
+    update reservation_information
+
+[33mcommit 353c46b6592690804b93aea0bc4c94e9b73756b4[m
+Author: Pansawut Pujaroen <66000897+Masterboom-tha@users.noreply.github.com>
+Date:   Thu Nov 7 18:46:20 2024 +0700
+
+    Initial commit

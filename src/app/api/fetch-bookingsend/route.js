@@ -19,32 +19,35 @@ export async function POST(request) {
   try {
     connection = await dbConnect()
 
-    const query = `
-      SELECT
-        b.id,
-        b.number_send,
-        b.booking_no,
-        b.tacking_no,
-        b.tacking_first,
-        b.senddate,
-        b.weight,
-        b.send_price,
-        b.send_status,
-        b.createdate,
-        b.uni_id,
-        b.user_id,
-        b.film_no,
-        ab.name_for_rec AS customerName
-      FROM
-        b_bookingsend AS b
-      LEFT JOIN
-        address_booking AS ab ON b.booking_no = ab.booking_no
-      WHERE
-        b.uni_id = ?
+    // ดึงข้อมูลจากตาราง b_bookingsend
+    const bookingQuery = `
+      SELECT * FROM b_bookingsend WHERE uni_id = ?
     `
-    const [rows] = await connection.execute(query, [uni_id])
+    const [bookingRows] = await connection.execute(bookingQuery, [uni_id])
 
-    return NextResponse.json({ success: true, data: rows })
+    // ดึงข้อมูลจากตาราง address_booking โดยใช้ booking_no จากผลลัพธ์แรก
+    const bookingNos = bookingRows.map(row => row.booking_no)
+    let addressRows = []
+
+    if (bookingNos.length > 0) {
+      const placeholders = bookingNos.map(() => '?').join(',')
+      const addressQuery = `
+        SELECT booking_no, name_for_rec FROM address_booking WHERE booking_no IN (${placeholders})
+      `
+      const [addressResults] = await connection.execute(addressQuery, bookingNos)
+      addressRows = addressResults
+    }
+
+    // รวมข้อมูลจากทั้งสองตารางโดย match booking_no
+    const combinedData = bookingRows.map(booking => {
+      const address = addressRows.find(addr => addr.booking_no === booking.booking_no)
+      return {
+        ...booking,
+        customerName: address ? address.name_for_rec : null
+      }
+    })
+
+    return NextResponse.json({ success: true, data: combinedData })
   } catch (error) {
     console.error('Error fetching booking data:', error)
     return NextResponse.json({ success: false, error: 'Failed to fetch booking data' }, { status: 500 })

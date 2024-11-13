@@ -1,5 +1,9 @@
 import mysql from 'mysql2/promise'
 
+// กำหนดให้ API Route นี้เป็นแบบไดนามิกเพื่อรองรับการใช้พารามิเตอร์
+export const dynamic = 'force-dynamic'
+
+// ฟังก์ชันเชื่อมต่อกับฐานข้อมูล
 const dbConnect = async () => {
   return await mysql.createConnection({
     host: process.env.DB_HOST,
@@ -15,6 +19,7 @@ export async function GET(request) {
   try {
     connection = await dbConnect()
 
+    // ตรวจสอบการมีอยู่ของพารามิเตอร์ uni_id
     const { searchParams } = new URL(request.url)
     const uni_id = searchParams.get('uni_id')
 
@@ -41,7 +46,6 @@ export async function GET(request) {
       WHERE
         uni_id = ?
     `
-
     const [addressRows] = await connection.execute(addressQuery, [uni_id])
 
     const addressIds = addressRows.map(row => row.id)
@@ -63,7 +67,6 @@ export async function GET(request) {
       WHERE
         address_id IN (${addressIds.map(() => '?').join(', ')})
     `
-
     const [bookingRows] = await connection.execute(bookingQuery, addressIds)
 
     // 3. จับคู่ booking_no กับ address_id
@@ -72,7 +75,7 @@ export async function GET(request) {
       if (!bookingMap.has(row.address_id)) {
         bookingMap.set(row.address_id, [])
       }
-      bookingMap.get(row.address_id).push(row.booking_no) // เปลี่ยนจาก booking_id เป็น booking_no
+      bookingMap.get(row.address_id).push(row.booking_no)
     })
 
     // 4. เพิ่ม booking_ids ลงใน addressRows
@@ -126,154 +129,3 @@ export async function GET(request) {
     }
   }
 }
-
-// ฟังก์ชัน PUT และ DELETE ที่ถูกคอมเมนต์ออกมาแล้วหรือมีการแก้ไขเพิ่มเติม
-
-// export async function PUT(request) {
-//   let connection
-
-//   try {
-//     connection = await dbConnect()
-
-//     const body = await request.json()
-//     let { id, film_no, booking_no, update_by, uni_id } = body
-
-//     if (!id) {
-//       return new Response(JSON.stringify({ error: 'Parameter id is required' }), {
-//         status: 400,
-//         headers: { 'Content-Type': 'application/json' }
-//       })
-//     }
-
-//     film_no = film_no !== undefined ? film_no : null
-//     booking_no = booking_no !== undefined ? booking_no : null
-//     update_by = update_by !== undefined ? update_by : null
-//     uni_id = uni_id !== undefined ? uni_id : null
-
-//     await connection.beginTransaction()
-
-//     const updateAddressQuery = `
-//       UPDATE address
-//       SET film_no = ?, booking_no = ?, update_date = NOW(), update_by = ?
-//       WHERE id = ?
-//     `
-//     await connection.execute(updateAddressQuery, [film_no, booking_no, update_by, id])
-
-//     const checkBookingQuery = `
-//       SELECT id FROM b_bookingfw WHERE orderid = ?
-//     `
-//     const [existingBooking] = await connection.execute(checkBookingQuery, [id])
-
-//     if (existingBooking.length > 0) {
-//       const updateBookingQuery = `
-//         UPDATE b_bookingfw
-//         SET booking_no = ?, film_no = ?, uni_id = ?
-//         WHERE orderid = ?
-//       `
-//       await connection.execute(updateBookingQuery, [booking_no, film_no, uni_id, id])
-//     } else {
-//       const insertBookingQuery = `
-//         INSERT INTO b_bookingfw (booking_no, uni_id, orderid, film_no)
-//         VALUES (?, ?, ?, ?)
-//       `
-//       await connection.execute(insertBookingQuery, [booking_no, uni_id, id, film_no])
-//     }
-
-//     const checkAddressBookingQuery = `
-//       SELECT * FROM address_booking WHERE address_id = ?
-//     `
-//     const [existingAddressBooking] = await connection.execute(checkAddressBookingQuery, [id])
-
-//     if (existingAddressBooking.length > 0) {
-//       const updateAddressBookingQuery = `
-//         UPDATE address_booking
-//         SET booking_no = ?, film_no = ?, uni_id = ?
-//         WHERE address_id = ?
-//       `
-//       const [updateResult] = await connection.execute(updateAddressBookingQuery, [booking_no, film_no, uni_id, id])
-//     } else {
-//       const insertAddressBookingQuery = `
-//         INSERT INTO address_booking (booking_no, address_id, film_no, uni_id)
-//         VALUES (?, ?, ?, ?)
-//       `
-//       const [insertResult] = await connection.execute(insertAddressBookingQuery, [booking_no, id, film_no, uni_id])
-//     }
-
-//     await connection.commit()
-
-//     return new Response(JSON.stringify({ message: 'Reservation updated/inserted successfully' }), {
-//       status: 200,
-//       headers: { 'Content-Type': 'application/json' }
-//     })
-//   } catch (error) {
-//     if (connection) {
-//       await connection.rollback()
-//     }
-//     console.error('Error updating/inserting reservation:', error.message)
-//     return new Response(
-//       JSON.stringify({
-//         error: 'Failed to update/insert reservation',
-//         details: error.message
-//       }),
-//       {
-//         status: 500,
-//         headers: { 'Content-Type': 'application/json' }
-//       }
-//     )
-//   } finally {
-//     if (connection) {
-//       await connection.end()
-//     }
-//   }
-// }
-
-// export async function DELETE(request) {
-//   let connection
-
-//   try {
-//     connection = await dbConnect()
-
-//     const body = await request.json()
-//     const { id, booking_no } = body
-
-//     if (!id || !booking_no) {
-//       return new Response(JSON.stringify({ error: 'Parameters id and booking_no are required' }), {
-//         status: 400,
-//         headers: { 'Content-Type': 'application/json' }
-//       })
-//     }
-
-//     await connection.beginTransaction()
-
-//     const deleteAddressBookingQuery = `
-//       DELETE FROM address_booking WHERE address_id = ? AND booking_no = ?
-//     `
-//     await connection.execute(deleteAddressBookingQuery, [id, booking_no])
-
-//     await connection.commit()
-
-//     return new Response(JSON.stringify({ message: 'Reservation deleted successfully' }), {
-//       status: 200,
-//       headers: { 'Content-Type': 'application/json' }
-//     })
-//   } catch (error) {
-//     if (connection) {
-//       await connection.rollback()
-//     }
-//     console.error('Error deleting reservation:', error.message)
-//     return new Response(
-//       JSON.stringify({
-//         error: 'Failed to delete reservation',
-//         details: error.message
-//       }),
-//       {
-//         status: 500,
-//         headers: { 'Content-Type': 'application/json' }
-//       }
-//     )
-//   } finally {
-//     if (connection) {
-//       await connection.end()
-//     }
-//   }
-// }

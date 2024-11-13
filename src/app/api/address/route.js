@@ -25,23 +25,43 @@ export async function POST(request) {
   try {
     connection = await dbConnect()
 
-    // ดึงข้อมูลจากตาราง address_booking, address_print และ address โดยใช้ uni_id
+    // ดึงข้อมูลจากตาราง address_booking, address_print, address และ b_bookingfw โดยใช้ uni_id
     const [rows] = await connection.execute(
       `
-  SELECT ab.id, ab.booking_no, ab.signs_id, ab.fname, ab.lname, ab.uni_id, ab.addno, ab.moo, ab.soi, ab.road, ab.tumbol, ab.amphur, ab.province, ab.zip, ab.tel, ab.name_for_rec, ab.address_id,
-         ad.film_no, -- ดึง film_no จากตาราง address โดยใช้ address_id
-         m_district.district_name AS tumbol_name,
-         m_amphur.amphur_name AS amphur_name,
-         m_province.province_name AS province_name,
-         ap.pstatus, ap.pprint
-  FROM address_booking ab
-  LEFT JOIN m_p_district m_district ON ab.tumbol = m_district.district_id
-  LEFT JOIN m_p_amphur m_amphur ON ab.amphur = m_amphur.amphur_id
-  LEFT JOIN m_p_province m_province ON ab.province = m_province.province_id
-  LEFT JOIN address_print ap ON ab.booking_no = ap.booking_no AND ab.uni_id = ap.uni_id
-  LEFT JOIN address ad ON ab.address_id = ad.id -- เชื่อมกับ address โดยใช้ address_id
-  WHERE ab.uni_id = ?
-  `,
+      SELECT
+        ab.id,
+        ab.booking_no,
+        ab.signs_id,
+        ab.uni_id,
+        ab.addno,
+        ab.moo,
+        ab.soi,
+        ab.road,
+        ab.tumbol,
+        ab.amphur,
+        ab.province,
+        ab.zip,
+        ab.tel,
+        ab.name_for_rec,
+        ab.address_id,
+        ad.film_no, -- ดึง film_no จากตาราง address โดยใช้ address_id
+        ad.fname, -- ดึง fname จากตาราง address
+        ad.lname, -- ดึง lname จากตาราง address
+        m_district.district_name AS tumbol_name,
+        m_amphur.amphur_name AS amphur_name,
+        m_province.province_name AS province_name,
+        ap.pstatus,
+        ap.pprint,
+        bbf.booking_set -- ดึง booking_set จาก b_bookingfw
+      FROM address_booking ab
+      LEFT JOIN m_p_district m_district ON ab.tumbol = m_district.district_id
+      LEFT JOIN m_p_amphur m_amphur ON ab.amphur = m_amphur.amphur_id
+      LEFT JOIN m_p_province m_province ON ab.province = m_province.province_id
+      LEFT JOIN address_print ap ON ab.booking_no = ap.booking_no AND ab.uni_id = ap.uni_id
+      LEFT JOIN address ad ON ab.address_id = ad.id -- เชื่อมกับ address โดยใช้ address_id
+      LEFT JOIN b_bookingfw bbf ON ab.booking_no = bbf.booking_no AND ad.film_no = bbf.film_no AND ab.uni_id = bbf.uni_id -- เชื่อมกับ b_bookingfw
+      WHERE ab.uni_id = ?
+      `,
       [uni_id]
     )
 
@@ -49,8 +69,8 @@ export async function POST(request) {
     const filteredRows = rows.map(row => ({
       id: row.id,
       signs_id: row.signs_id,
-      fname: row.fname,
-      lname: row.lname,
+      fname: row.fname, // ใช้ fname จากตาราง address
+      lname: row.lname, // ใช้ lname จากตาราง address
       uni_id: row.uni_id,
       addno: row.addno,
       moo: row.moo,
@@ -66,11 +86,9 @@ export async function POST(request) {
       name_for_rec: row.name_for_rec,
       address_id: row.address_id, // เพิ่ม address_id
       print_status: row.pstatus || '-', // สถานะการพิมพ์จาก address_print
-      print_date: row.pprint || '-' // วันที่พิมพ์จาก address_print
+      print_date: row.pprint || '-', // วันที่พิมพ์จาก address_print
+      booking_set: row.booking_set || '-' // ดึง booking_set จาก b_bookingfw
     }))
-
-    // ส่งผลลัพธ์เฉพาะฟิลด์ที่เลือกกลับไปยัง client
-    return NextResponse.json(filteredRows, { status: 200 })
 
     // ส่งผลลัพธ์เฉพาะฟิลด์ที่เลือกกลับไปยัง client
     return NextResponse.json(filteredRows, { status: 200 })
@@ -84,24 +102,47 @@ export async function POST(request) {
   }
 }
 
-// API สำหรับอัพเดตสถานะการพิมพ์
-export async function PATCH(request) {
+// API สำหรับอัพเดตสถานะการพิมพ์ (PUT) โดยรองรับหลายรายการ
+export async function PUT(request) {
   const body = await request.json() // รับค่า body จาก request
-  const { uni_id, booking_no } = body // ดึงค่าจาก body
+  const printDataArray = body // สมมติว่าเป็น array ของข้อมูลการพิมพ์
 
-  if (!uni_id || !booking_no) {
-    return NextResponse.json({ error: 'Missing uni_id or booking_no' }, { status: 400 })
+  if (!Array.isArray(printDataArray)) {
+    return NextResponse.json({ error: 'Invalid data format, expected an array of objects' }, { status: 400 })
   }
 
   let connection
   try {
     connection = await dbConnect()
 
-    // อัพเดตสถานะการพิมพ์
-    await connection.execute(
-      `UPDATE address_print SET pstatus = 'Y', pprint = NOW() WHERE uni_id = ? AND booking_no = ?`,
-      [uni_id, booking_no]
-    )
+    for (const printData of printDataArray) {
+      const { uni_id, booking_no, film_no } = printData
+
+      if (!uni_id || !booking_no || !film_no) {
+        continue // ข้ามรายการที่ข้อมูลไม่ครบ
+      }
+
+      // ตรวจสอบว่ามีแถวที่ตรงกับ uni_id, booking_no และ film_no หรือไม่
+      const [existingRows] = await connection.execute(
+        `SELECT * FROM address_print WHERE uni_id = ? AND booking_no = ? AND film_no = ?`,
+        [uni_id, booking_no, film_no]
+      )
+
+      if (existingRows.length === 0) {
+        // ถ้าไม่มีแถวที่ตรงกัน ให้แทรกข้อมูลใหม่
+        await connection.execute(
+          `INSERT INTO address_print (uni_id, booking_no, film_no, pstatus, pprint) VALUES (?, ?, ?, 'Y', NOW())`,
+          [uni_id, booking_no, film_no]
+        )
+      } else {
+        // ถ้ามีแถวที่ตรงกัน ให้ทำการอัพเดต
+        await connection.execute(
+          `UPDATE address_print SET pstatus = 'Y', pprint = NOW() WHERE uni_id = ? AND booking_no = ? AND film_no = ?`,
+          [uni_id, booking_no, film_no]
+        )
+      }
+    }
+
     return NextResponse.json({ success: true, message: 'Print status updated successfully' }, { status: 200 })
   } catch (error) {
     console.error('Error updating print status:', error)

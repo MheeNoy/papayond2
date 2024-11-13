@@ -19,17 +19,20 @@ import {
   FormControl,
   InputLabel,
   Pagination,
-  CircularProgress
+  CircularProgress,
+  Snackbar,
+  Alert
 } from '@mui/material'
-import { jsPDF } from 'jspdf'
 
 // ฟังก์ชันแปลงวันที่
 const formatDate = isoDateString => {
-  if (!isoDateString) return '' // ถ้าไม่มีข้อมูล ส่งค่าว่างกลับ
+  if (!isoDateString || isoDateString === '-') return '-' // ถ้าไม่มีข้อมูล ส่งค่าว่างกลับ
   const date = new Date(isoDateString)
-  if (isNaN(date.getTime())) return '' // ตรวจสอบว่าวันที่ที่ได้รับคือวันที่ที่ถูกต้องหรือไม่
+  if (isNaN(date.getTime())) return '-' // ตรวจสอบว่าวันที่ที่ได้รับคือวันที่ที่ถูกต้องหรือไม่
 
-  return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`
+  return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, '0')}/${date.getFullYear()}`
 }
 
 // สร้างธีมสำหรับตาราง
@@ -50,8 +53,7 @@ export default function Page() {
     orderNumber: '',
     customerName: '',
     parcelSet: 'ทุกชุด',
-    status: 'ยังไม่ได้พิมพ์',
-    address: 'เฉพาะมีที่อยู่'
+    status: 'ยังไม่ได้พิมพ์'
   })
 
   const [rows, setRows] = useState([])
@@ -60,6 +62,18 @@ export default function Page() {
   const itemsPerPage = 10 // จำนวนรายการต่อหน้า
   const [isLoading, setIsLoading] = useState(false) // สถานะการโหลด
   const [printLimit, setPrintLimit] = useState(500) // เก็บจำนวนรายการที่จะพิมพ์
+
+  // ตัวแปรสถานะสำหรับ Snackbar
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success') // 'success' หรือ 'error'
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return
+    }
+    setSnackbarOpen(false)
+  }
 
   // ฟังก์ชันสำหรับดึง uni_id จาก sessionStorage
   const getUniIdFromSession = () => {
@@ -76,20 +90,47 @@ export default function Page() {
       axios
         .post('/api/address', { uni_id }) // ส่ง uni_id ใน body
         .then(response => {
-          setRows(response.data)
-          setFilteredRows(response.data) // ตั้งค่า filteredRows เป็นข้อมูลที่ได้จาก API
+          if (Array.isArray(response.data)) {
+            setRows(response.data)
+            setFilteredRows(response.data) // ตั้งค่า filteredRows เป็นข้อมูลที่ได้จาก API
+          } else {
+            console.error('API did not return an array:', response.data)
+            // แสดง Snackbar ข้อผิดพลาด
+            setSnackbarMessage('เกิดข้อผิดพลาดในการดึงข้อมูล')
+            setSnackbarSeverity('error')
+            setSnackbarOpen(true)
+          }
         })
         .catch(error => {
           console.error('Error fetching data:', error)
+          // แสดง Snackbar ข้อผิดพลาด
+          setSnackbarMessage('เกิดข้อผิดพลาดในการดึงข้อมูล')
+          setSnackbarSeverity('error')
+          setSnackbarOpen(true)
         })
         .finally(() => {
           setIsLoading(false) // เสร็จสิ้นการโหลด
         })
+    } else {
+      console.error('uni_id is null')
+      // แสดง Snackbar ข้อผิดพลาด
+      setSnackbarMessage('ไม่พบข้อมูลมหาวิทยาลัย')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
     }
   }, []) // [] ทำให้ useEffect ทำงานเพียงครั้งเดียวตอนที่คอมโพเนนต์ถูกโหลด
 
   // ฟังก์ชันการค้นหาในตาราง
   const handleSearch = () => {
+    if (!Array.isArray(rows)) {
+      console.error('rows is not an array')
+      // แสดง Snackbar ข้อผิดพลาด
+      setSnackbarMessage('เกิดข้อผิดพลาดในการค้นหา')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
+      return
+    }
+
     const filtered = rows.filter(row => {
       const matchesFilmNo = formData.filmNo ? row.film_no.includes(formData.filmNo) : true
       const matchesOrderNumber = formData.orderNumber ? row.booking_no.includes(formData.orderNumber) : true
@@ -130,10 +171,12 @@ export default function Page() {
     // ตรวจสอบว่ามีข้อมูลที่จะพิมพ์
     if (printItems.length === 0) {
       console.error('ไม่มีข้อมูลที่จะพิมพ์')
+      // แสดง Snackbar ข้อผิดพลาด
+      setSnackbarMessage('ไม่มีข้อมูลที่จะพิมพ์')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
       return
     }
-
-    // อัปเดตสถานะการพิมพ์ผ่านการเรียก PATCH API
 
     // สร้างเนื้อหาที่จะพิมพ์
     const printContent = printItems
@@ -160,6 +203,10 @@ export default function Page() {
     // ตรวจสอบว่าเนื้อหาที่จะพิมพ์ถูกสร้างหรือไม่
     if (!printContent) {
       console.error('ไม่มีเนื้อหาที่พิมพ์ได้')
+      // แสดง Snackbar ข้อผิดพลาด
+      setSnackbarMessage('ไม่มีเนื้อหาที่พิมพ์ได้')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
       return
     }
 
@@ -200,12 +247,47 @@ export default function Page() {
     printWindow.document.close()
     printWindow.focus()
     printWindow.print()
+
+    // หลังจากการพิมพ์ สำเร็จ ให้ทำการบันทึกข้อมูลลงฐานข้อมูล
+    try {
+      // เตรียมข้อมูลที่จะส่งไปยัง API
+      const printData = printItems.map(row => ({
+        uni_id: uni_id,
+        booking_no: row.booking_no,
+        film_no: row.film_no
+      }))
+
+      // เรียกใช้ API เพื่อบันทึกข้อมูลการพิมพ์
+      await axios.put('/api/address', printData)
+
+      // แสดง Snackbar สำเร็จ
+      setSnackbarMessage('บันทึกสถานะการพิมพ์สำเร็จ')
+      setSnackbarSeverity('success')
+      setSnackbarOpen(true)
+
+      // อัพเดตสถานะการพิมพ์ในตาราง
+      const updatedRows = rows.map(row => {
+        if (printData.some(data => data.booking_no === row.booking_no && data.film_no === row.film_no)) {
+          return { ...row, print_status: 'Y', print_date: new Date().toISOString() }
+        }
+        return row
+      })
+
+      setRows(updatedRows)
+      setFilteredRows(updatedRows)
+    } catch (error) {
+      console.error('เกิดข้อผิดพลาดในการบันทึกสถานะการพิมพ์:', error)
+      // แสดง Snackbar ข้อผิดพลาด
+      setSnackbarMessage('เกิดข้อผิดพลาดในการบันทึกสถานะการพิมพ์')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
+    }
   }
 
   // คำนวณรายการที่จะต้องแสดงในแต่ละหน้า
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentItems = filteredRows.slice(indexOfFirstItem, indexOfLastItem)
+  const currentItems = Array.isArray(filteredRows) ? filteredRows.slice(indexOfFirstItem, indexOfLastItem) : []
 
   // ฟังก์ชันสำหรับเปลี่ยนหน้า
   const handlePageChange = (event, value) => {
@@ -219,7 +301,7 @@ export default function Page() {
       </Typography>
 
       {/* ฟิลด์ค้นหา */}
-      <Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
+      <Box display='flex' flexWrap='wrap' alignItems='center' mb={2}>
         <TextField
           label='เลขฟิล์ม'
           name='filmNo'
@@ -227,7 +309,7 @@ export default function Page() {
           onChange={handleInputChange}
           variant='outlined'
           size='small'
-          sx={{ maxWidth: '200px', mr: 2 }}
+          sx={{ maxWidth: '200px', mr: 2, mb: 2 }}
         />
 
         <TextField
@@ -237,7 +319,7 @@ export default function Page() {
           onChange={handleInputChange}
           variant='outlined'
           size='small'
-          sx={{ maxWidth: '200px', mr: 2 }}
+          sx={{ maxWidth: '200px', mr: 2, mb: 2 }}
         />
 
         <TextField
@@ -247,10 +329,10 @@ export default function Page() {
           onChange={handleInputChange}
           variant='outlined'
           size='small'
-          sx={{ maxWidth: '200px', mr: 2 }}
+          sx={{ maxWidth: '200px', mr: 2, mb: 2 }}
         />
 
-        <FormControl sx={{ maxWidth: '150px', mr: 2 }}>
+        <FormControl sx={{ maxWidth: '150px', mr: 2, mb: 2 }}>
           <InputLabel id='parcel-set-label'>ชุด</InputLabel>
           <Select
             labelId='parcel-set-label'
@@ -266,7 +348,7 @@ export default function Page() {
           </Select>
         </FormControl>
 
-        <FormControl sx={{ maxWidth: '150px', mr: 2 }}>
+        <FormControl sx={{ maxWidth: '150px', mr: 2, mb: 2 }}>
           <InputLabel id='status-label'>สถานะ</InputLabel>
           <Select
             labelId='status-label'
@@ -288,7 +370,7 @@ export default function Page() {
       </Box>
 
       {/* Dropdown สำหรับเลือกจำนวนรายการที่ต้องการพิมพ์ */}
-      <FormControl sx={{ maxWidth: '150px', mb: 2 }}>
+      <FormControl sx={{ maxWidth: '150px', mb: 2, mr: 2 }}>
         <InputLabel id='print-limit-label'>จำนวนที่ต้องการพิมพ์</InputLabel>
         <Select
           className='mr-3'
@@ -329,7 +411,7 @@ export default function Page() {
                   <StyledTableHeadCell>ชื่อผู้รับของ</StyledTableHeadCell>
                   <StyledTableHeadCell>ที่อยู่</StyledTableHeadCell>
                   <StyledTableHeadCell>เบอร์โทร</StyledTableHeadCell>
-                  <StyledTableHeadCell>ชุด</StyledTableHeadCell>
+                  <StyledTableHeadCell>ชุดที่</StyledTableHeadCell>
                   <StyledTableHeadCell>วันที่พิมพ์</StyledTableHeadCell>
                   <StyledTableHeadCell>สถานะ</StyledTableHeadCell>
                 </TableRow>
@@ -341,17 +423,19 @@ export default function Page() {
                       <StyledTableCell>{indexOfFirstItem + index + 1}</StyledTableCell>
                       <StyledTableCell>{row.film_no || '-'}</StyledTableCell>
                       <StyledTableCell>{row.booking_no}</StyledTableCell>
-                      <StyledTableCell>{row.name_for_rec}</StyledTableCell>
-                      <StyledTableCell>{row.name_for_rec}</StyledTableCell>
+                      <StyledTableCell>{row.fname}</StyledTableCell>
+                      <StyledTableCell>{row.lname}</StyledTableCell>
                       <StyledTableCell>
-                        {`${row.addno || ''} หมู่ ${row.moo || ''} ซอย ${row.soi || ''} ถนน ${row.road || ''} ตำบล ${row.tumbol || ''} อำเภอ ${row.amphur || ''} จังหวัด ${row.province || ''} รหัสไปรษณีย์ ${row.zip || ''}`}
+                        {`${row.addno || ''} หมู่ ${row.moo || ''} ซอย ${row.soi || ''} ถนน ${
+                          row.road || ''
+                        } ตำบล ${row.tumbol || ''} อำเภอ ${row.amphur || ''} จังหวัด ${
+                          row.province || ''
+                        } รหัสไปรษณีย์ ${row.zip || ''}`}
                       </StyledTableCell>
                       <StyledTableCell>{row.tel || '-'}</StyledTableCell>
-                      <StyledTableCell>{row.set || '-'}</StyledTableCell>
-                      <StyledTableCell>{formatDate(row.print_date || '-')}</StyledTableCell>
-                      <StyledTableCell>
-                        {row.print_status === 'Y' ? 'พิมพ์แล้ว' : 'ยังไม่ได้พิมพ์' || '-'}
-                      </StyledTableCell>
+                      <StyledTableCell>{row.booking_set || '-'}</StyledTableCell>
+                      <StyledTableCell>{formatDate(row.print_date)}</StyledTableCell>
+                      <StyledTableCell>{row.print_status === 'Y' ? 'พิมพ์แล้ว' : 'ยังไม่ได้พิมพ์'}</StyledTableCell>
                     </TableRow>
                   ))
                 ) : (
@@ -368,7 +452,7 @@ export default function Page() {
           {/* Pagination */}
           <Box display='flex' justifyContent='center' mt={2}>
             <Pagination
-              count={Math.ceil(filteredRows.length / itemsPerPage)} // จำนวนหน้าทั้งหมด
+              count={Math.ceil((filteredRows && filteredRows.length) / itemsPerPage) || 1} // จำนวนหน้าทั้งหมด
               page={currentPage} // หน้าปัจจุบัน
               onChange={handlePageChange} // เปลี่ยนหน้า
               color='primary'
@@ -376,6 +460,18 @@ export default function Page() {
           </Box>
         </>
       )}
+
+      {/* Snackbar */}
+      <Snackbar
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
 
       {/* สไตล์พิเศษสำหรับการพิมพ์ */}
       <style jsx>{`

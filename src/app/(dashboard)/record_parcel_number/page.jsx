@@ -16,7 +16,9 @@ import {
   Select,
   MenuItem,
   styled,
-  Pagination
+  Pagination,
+  Snackbar,
+  Alert
 } from '@mui/material'
 
 // สร้างธีมสำหรับตาราง
@@ -54,6 +56,18 @@ const RecordParcelNumber = () => {
 
   const [bookingNos, setBookingNos] = useState([])
 
+  // ตัวแปรสถานะสำหรับ Snackbar
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success') // 'success' หรือ 'error'
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return
+    }
+    setSnackbarOpen(false)
+  }
+
   useEffect(() => {
     if (bookingNos.length > 0) {
       setFormData(prevFormData => ({
@@ -63,38 +77,45 @@ const RecordParcelNumber = () => {
     }
   }, [bookingNos])
 
-  useEffect(() => {
-    const fetchBookingData = async () => {
-      try {
-        const uni_id = JSON.parse(sessionStorage.getItem('selectedUniversity')).uni_id
-        const response = await fetch('/api/fetch-bookingsend', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ uni_id, film_no: formData.filmNo }) // ส่ง film_no ด้วยเพื่อดึงข้อมูลที่ต้องการ
-        })
+  const fetchBookingData = async () => {
+    try {
+      const uni_id = JSON.parse(sessionStorage.getItem('selectedUniversity')).uni_id
+      const response = await fetch('/api/fetch-bookingsend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ uni_id, film_no: formData.filmNo })
+      })
 
-        if (response.ok) {
-          const data = await response.json()
+      if (response.ok) {
+        const data = await response.json()
+        console.log('fetchBookingData response:', data) // ตรวจสอบข้อมูลที่ได้จาก API
 
-          // อัปเดตค่า formData โดยใช้ค่า numberSend จาก backend โดยตรง
+        if (data.data && data.data.length > 0) {
+          const firstRecord = data.data[0] // รับข้อมูลจากรายการแรกใน array
+          const { id, customerName, numberSend, booking_no } = firstRecord
+
           setFormData(prevFormData => ({
             ...prevFormData,
-            customerName: data.customerName || '',
-            boxCount: data.numberSend, // ใช้ค่า numberSend ที่ได้จาก backend ตรงๆ
-            orderNumber: data.bookingNos && data.bookingNos.length > 0 ? data.bookingNos[0] : ''
+            customerName: customerName || '',
+            boxCount: numberSend,
+            orderNumber: booking_no || '',
+            id // ตั้งค่า id ใน formData
           }))
-
-          setRows(data.data)
-        } else {
-          console.error('Failed to fetch booking data')
+          console.log('Set formData.id:', id) // ตรวจสอบว่า id ถูกตั้งค่า
         }
-      } catch (error) {
-        console.error('Error fetching booking data:', error)
-      }
-    }
 
+        setRows(data.data)
+      } else {
+        console.error('Failed to fetch booking data')
+      }
+    } catch (error) {
+      console.error('Error fetching booking data:', error)
+    }
+  }
+
+  useEffect(() => {
     fetchBookingData()
   }, [])
 
@@ -102,13 +123,18 @@ const RecordParcelNumber = () => {
     setCurrentPage(value)
   }
 
-  const handleInputChange = async e => {
+  const handleInputChange = e => {
     const { name, value } = e.target
     setFormData({ ...formData, [name]: value })
+  }
 
-    if (name === 'filmNo' && value) {
+  const handleFilmNoBlur = async e => {
+    const { value } = e.target
+    if (value) {
       try {
         const uni_id = JSON.parse(sessionStorage.getItem('selectedUniversity')).uni_id
+        console.log('Sending to find-customer:', { film_no: value, uni_id }) // ตรวจสอบ payload ที่จะส่งไป
+
         const response = await fetch('/api/find-customer', {
           method: 'POST',
           headers: {
@@ -122,15 +148,24 @@ const RecordParcelNumber = () => {
           setFormData(prevFormData => ({
             ...prevFormData,
             customerName: data.customerName,
-            boxCount: data.numberSend, // ใช้ค่า numberSend ที่ได้จาก backend ตรงๆ
+            boxCount: data.numberSend,
             orderNumber: data.bookingNos && data.bookingNos.length > 0 ? data.bookingNos[0] : ''
           }))
           setBookingNos(data.bookingNos || [])
         } else {
           console.error('Failed to fetch customerName and bookingNos')
+
+          // แสดง Snackbar ข้อผิดพลาด
+          setSnackbarMessage('ไม่พบข้อมูลลูกค้าและเลขใบจอง')
+          setSnackbarSeverity('error')
+          setSnackbarOpen(true)
         }
       } catch (error) {
         console.error('Error fetching customerName and bookingNos:', error)
+        // แสดง Snackbar ข้อผิดพลาด
+        setSnackbarMessage('เกิดข้อผิดพลาดในการดึงข้อมูลลูกค้า')
+        setSnackbarSeverity('error')
+        setSnackbarOpen(true)
       }
     }
   }
@@ -156,6 +191,11 @@ const RecordParcelNumber = () => {
         const result = await response.json()
         console.log(result.message)
 
+        // แสดง Snackbar สำเร็จ
+        setSnackbarMessage('บันทึกข้อมูลสำเร็จ')
+        setSnackbarSeverity('success')
+        setSnackbarOpen(true)
+
         // เรียก fetchBookingData เพื่อดึงข้อมูลใหม่ทั้งหมด
         fetchBookingData()
 
@@ -174,9 +214,19 @@ const RecordParcelNumber = () => {
         })
       } else {
         console.error('Failed to save data')
+
+        // แสดง Snackbar ข้อผิดพลาด
+        setSnackbarMessage('เกิดข้อผิดพลาดในการบันทึกข้อมูล')
+        setSnackbarSeverity('error')
+        setSnackbarOpen(true)
       }
     } catch (error) {
       console.error('Error saving data:', error)
+
+      // แสดง Snackbar ข้อผิดพลาด
+      setSnackbarMessage('เกิดข้อผิดพลาดในการบันทึกข้อมูล')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
     }
   }
 
@@ -192,11 +242,26 @@ const RecordParcelNumber = () => {
 
       if (response.ok) {
         setRows(rows.filter(row => row.id !== id))
+
+        // แสดง Snackbar สำเร็จ
+        setSnackbarMessage('ลบข้อมูลสำเร็จ')
+        setSnackbarSeverity('success')
+        setSnackbarOpen(true)
       } else {
         console.error('Failed to delete data')
+
+        // แสดง Snackbar ข้อผิดพลาด
+        setSnackbarMessage('เกิดข้อผิดพลาดในการลบข้อมูล')
+        setSnackbarSeverity('error')
+        setSnackbarOpen(true)
       }
     } catch (error) {
       console.error('Error deleting data:', error)
+
+      // แสดง Snackbar ข้อผิดพลาด
+      setSnackbarMessage('เกิดข้อผิดพลาดในการลบข้อมูล')
+      setSnackbarSeverity('error')
+      setSnackbarOpen(true)
     }
   }
 
@@ -259,6 +324,7 @@ const RecordParcelNumber = () => {
                   name='filmNo'
                   value={formData.filmNo}
                   onChange={handleInputChange}
+                  onBlur={handleFilmNoBlur} // เพิ่ม onBlur handler
                   variant='outlined'
                   fullWidth
                   size='small'
@@ -430,6 +496,18 @@ const RecordParcelNumber = () => {
           color='primary'
         />
       </Box>
+
+      {/* Snackbar */}
+      <Snackbar
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </div>
   )
 }

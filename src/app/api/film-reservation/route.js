@@ -1,5 +1,4 @@
 // app/api/film-reservation/route.js
-
 import mysql from 'mysql2/promise'
 
 // ฟังก์ชันเชื่อมต่อกับฐานข้อมูล
@@ -13,7 +12,6 @@ const dbConnect = async () => {
 }
 
 // API GET เพื่อดึงข้อมูลจากตาราง address_booking หรือ address ตามพารามิเตอร์ที่ส่งมา
-
 export async function GET(request) {
   let connection
 
@@ -37,14 +35,15 @@ export async function GET(request) {
 
     if (address_id) {
       // ดึง booking_no และ film_no ทั้งหมดจาก address_booking ตาม address_id
-      const query = 'SELECT booking_no, film_no FROM address_booking WHERE address_id = ?'
+      const query = 'SELECT id AS reservation_id, booking_no, film_no FROM address_booking WHERE address_id = ?'
       const params = [address_id]
       const [rows] = await connection.execute(query, params)
 
-      // สร้างอาร์เรย์ของ booking_no และ film_no จากผลลัพธ์ที่ได้
+      // สร้างอาร์เรย์ของ booking_no และ film_no จากผลลัพธ์ที่ได้ พร้อม reservation_id
       const bookingDetails = rows.map(row => ({
         booking_no: row.booking_no,
-        film_no: row.film_no
+        film_no: row.film_no,
+        reservation_id: row.reservation_id
       }))
 
       // ส่งข้อมูลกลับไป
@@ -66,7 +65,7 @@ export async function GET(request) {
           // ขั้นตอนที่ 2: ดึงข้อมูล booking จาก address_booking ตาม address_id ที่ได้จาก address
           // สร้าง placeholder สำหรับ IN clause
           const placeholders = addressIds.map(() => '?').join(', ')
-          const bookingQuery = `SELECT address_id, booking_no, film_no FROM address_booking WHERE address_id IN (${placeholders})`
+          const bookingQuery = `SELECT address_id, booking_no, film_no, id AS reservation_id FROM address_booking WHERE address_id IN (${placeholders})`
           const bookingParams = addressIds
           const [bookingRows] = await connection.execute(bookingQuery, bookingParams)
 
@@ -82,7 +81,8 @@ export async function GET(request) {
                   ...address,
                   film_no: address.film_no, // ดึง film_no จาก address
                   booking_no: booking.booking_no,
-                  booking_film_no: booking.film_no // film_no จาก booking
+                  booking_film_no: booking.film_no, // film_no จาก booking
+                  reservation_id: booking.reservation_id // เพิ่ม reservation_id
                 })
               })
             } else {
@@ -91,7 +91,8 @@ export async function GET(request) {
                 ...address,
                 film_no: address.film_no, // ดึง film_no จาก address
                 booking_no: null,
-                booking_film_no: null
+                booking_film_no: null,
+                reservation_id: null
               })
             }
           })
@@ -118,7 +119,6 @@ export async function GET(request) {
   }
 }
 
-// API PUT เพื่ออัปเดตข้อมูลในตาราง address_booking
 // API PUT เพื่ออัปเดตข้อมูลในตาราง address_booking และ address
 export async function PUT(request) {
   let connection
@@ -269,13 +269,10 @@ export async function POST(request) {
 
     // ตรวจสอบว่าฟิลด์ทั้งหมดมีค่า
     if (!id || !film_no || !booking_no || !update_by || !uni_id) {
-      return new Response(
-        { error: 'All fields except original_booking_no are required' },
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      )
+      return new Response(JSON.stringify({ error: 'All fields except original_booking_no are required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     // เชื่อมต่อกับฐานข้อมูล

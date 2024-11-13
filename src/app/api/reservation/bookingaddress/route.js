@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise'
-
+export const dynamic = 'force-dynamic'
 // ฟังก์ชันเชื่อมต่อกับฐานข้อมูล
 const dbConnect = async () => {
   return await mysql.createConnection({

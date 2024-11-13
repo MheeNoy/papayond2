@@ -1,4 +1,4 @@
-// pages/api/bookingfw.js
+// app/api/bookingfw/route.js
 
 import { NextResponse } from 'next/server'
 import mysql from 'mysql2/promise'

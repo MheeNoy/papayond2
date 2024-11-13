@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation' // เพิ่ม useRouter
+import { useSearchParams, useRouter } from 'next/navigation'
 import axios from 'axios'
 import { getSession } from 'next-auth/react'
 import {
@@ -21,8 +21,6 @@ import {
   Alert,
   Snackbar,
   Divider,
-  IconButton,
-  Modal,
   Table,
   TableBody,
   TableCell,
@@ -30,9 +28,9 @@ import {
   TableHead,
   TableRow
 } from '@mui/material'
-import { styled } from '@mui/material/styles' // เพิ่มการนำเข้า styled
-import PhotoIcon from '@mui/icons-material/Photo' // ไอคอนสำหรับเพิ่มภาพหมู่
-import ColorLensIcon from '@mui/icons-material/ColorLens' // ไอคอนสำหรับเปลี่ยนสีกรอบ
+import { styled } from '@mui/material/styles'
+import PhotoIcon from '@mui/icons-material/Photo'
+import ColorLensIcon from '@mui/icons-material/ColorLens'
 
 // การสร้าง Styled Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -86,12 +84,6 @@ const ReservationInformation = () => {
     }))
   )
 
-  // State สำหรับ Modal
-  const [openModal, setOpenModal] = useState(false)
-  const [selectedAddressId, setSelectedAddressId] = useState(null)
-  const [selectedBookingNoInModal, setSelectedBookingNoInModal] = useState('')
-  const [currentFilmNo, setCurrentFilmNo] = useState('')
-
   const [activeTab, setActiveTab] = useState('address')
 
   // New states for dropdown data
@@ -99,6 +91,8 @@ const ReservationInformation = () => {
   const [amphurs, setAmphurs] = useState([])
   const [districts, setDistricts] = useState([])
   const [postcodes, setPostcodes] = useState([])
+
+  const [orderid, setOrderid] = useState(0) // เพิ่ม state สำหรับ orderid
 
   const router = useRouter() // ใช้ useRouter จาก 'next/navigation'
 
@@ -113,61 +107,76 @@ const ReservationInformation = () => {
     }
   }
 
-  useEffect(() => {
-    console.log('useEffect for fetchSelectedSets is called')
+  // ฟังก์ชัน fetchSelectedSets ที่ปรับปรุงแล้ว
+  const fetchSelectedSets = async booking_no => {
+    try {
+      const resservationData = JSON.parse(sessionStorage.getItem('resservationData'))
+      const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
 
-    const fetchSelectedSets = async () => {
-      try {
-        console.log('Starting fetchSelectedSets')
+      const id = resservationData?.id
+      const uni_id = selectedUniversity?.uni_id
 
-        // ดึงข้อมูลจาก sessionStorage
-        const resservationData = JSON.parse(sessionStorage.getItem('resservationData'))
-        const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
+      if (!id || !uni_id || !booking_no) {
+        console.error('Missing required data: id, uni_id, or booking_no')
+        setOrderid(0)
+        setSets(prevSets => prevSets.map(set => ({ ...set, quantity: 0, addon1: false, addon2: false })))
+        return
+      }
 
-        console.log('Reservation Data:', resservationData)
-        console.log('Selected University:', selectedUniversity)
+      setOrderid(id) // เซ็ตค่า orderid จาก resservationData.id
 
-        const id = resservationData?.id
-        const booking_no = resservationData?.booking_no
-        const uni_id = selectedUniversity?.uni_id
+      const response = await axios.post('/api/get-selected-sets', {
+        id,
+        uni_id,
+        booking_no
+      })
 
-        // ตรวจสอบว่าข้อมูลพร้อมหรือไม่ก่อนเรียก API
-        if (!id || !uni_id || !booking_no) {
-          console.error('Missing required data from sessionStorage')
-          return
-        }
+      console.log('Response from get-selected-sets:', response.data)
 
-        console.log('Calling API with:', { id, uni_id, booking_no })
+      const selectedSetsData = response.data
 
-        // เรียก API โดยใช้ POST และส่งข้อมูลใน body
-        const response = await axios.post('/api/get-selected-sets', {
-          id,
-          uni_id,
-          booking_no
-        })
-
-        console.log('Response from get-selected-sets:', response.data)
-
-        const selectedSetsData = response.data
-
-        // อัปเดตข้อมูล `sets` โดยเทียบกับข้อมูลที่ได้จาก API
-        const updatedSets = sets.map((set, index) => {
+      setSets(prevSets =>
+        prevSets.map((set, index) => {
           const matchingSet = selectedSetsData.find(item => parseInt(item.booking_set) === index + 1)
 
           if (matchingSet) {
             return {
               ...set,
               quantity: matchingSet.amount,
-              addon2: matchingSet.chang_eleph === 1,
-              disabled: false
+              addon1: matchingSet.add_ademgo === 1,
+              addon2: matchingSet.chang_eleph === 1
+              // ไม่เปลี่ยนแปลง disabled จาก fetchGroupData
             }
           }
-          return set
+          // ถ้าไม่มีชุดที่ตรงกันสำหรับ booking_no นี้ ให้ตั้งค่าด้วย 0 และไม่เปลี่ยนแปลง disabled
+          return { ...set, quantity: 0, addon1: false, addon2: false }
         })
+      )
+    } catch (error) {
+      console.error('Error fetching selected sets:', error)
+      // ในกรณีเกิดข้อผิดพลาด ให้ตั้งค่าชุดทั้งหมดเป็น disabled
+      setOrderid(0)
+      setSets(prevSets => prevSets.map(set => ({ ...set, quantity: 0, addon1: false, addon2: false })))
+    }
+  }
 
-        console.log('Updated Sets:', updatedSets)
+  useEffect(() => {
+    const fetchSelectedSetsInitial = async () => {
+      try {
+        const resservationData = JSON.parse(sessionStorage.getItem('resservationData'))
+        const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
 
-        setSets(updatedSets)
+        const id = resservationData?.id
+        const booking_no = resservationData?.booking_no
+        const uni_id = selectedUniversity?.uni_id
+
+        if (!id || !uni_id || !booking_no) {
+          console.error('Missing required data from sessionStorage')
+          return
+        }
+
+        // Initial fetchSelectedSets with booking_no from sessionStorage
+        await fetchSelectedSets(booking_no)
       } catch (error) {
         console.error('Error fetching selected sets:', error)
       }
@@ -177,32 +186,133 @@ const ReservationInformation = () => {
       const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
       const uni_id = selectedUniversity?.uni_id
 
-      if (!uni_id) return // Early return if uni_id is not available
+      if (!uni_id) return
 
       try {
         const response = await axios.post('/api/pricegroup', { uni_id })
         const groupData = response.data
 
-        // Update sets based on groupData
-        const updatedSets = sets.map((set, index) => {
-          const group = groupData.find(g => g.group_id === index + 1)
-          return {
-            ...set,
-            disabled: !group || group.group_active !== 1 // Disable if no group or group_active is not 1
-          }
-        })
-        setSets(updatedSets)
+        setSets(prevSets =>
+          prevSets.map((set, index) => {
+            const group = groupData.find(g => g.group_id === index + 1)
+            return {
+              ...set,
+              disabled: !(group && group.group_active === 1)
+            }
+          })
+        )
       } catch (error) {
         console.error('Error fetching group data:', error)
       }
     }
 
-    fetchGroupData()
-    fetchSelectedSets()
-  }, []) // ไม่มี dependencies
+    const fetchData = async () => {
+      await fetchGroupData()
+      await fetchSelectedSetsInitial()
+    }
 
-  const handleSetChange = (index, field, value) => {
+    fetchData()
+  }, [])
+
+  // เพิ่ม useEffect สำหรับการดึงชุดเมื่อ selectedBookingNo เปลี่ยนแปลง
+  useEffect(() => {
+    if (selectedBookingNo) {
+      fetchSelectedSets(selectedBookingNo)
+    } else {
+      // ถ้าไม่มีการเลือกใบจอง ให้ตั้งค่าชุดทั้งหมดเป็น disabled
+      setSets(prevSets => prevSets.map(set => ({ ...set, quantity: 0, addon1: false, addon2: false })))
+    }
+  }, [selectedBookingNo])
+
+  // เพิ่มการสร้างฟังก์ชัน actionPriceGroup
+  const actionPriceGroup = async (action, data) => {
+    try {
+      console.log('Sending to API:', { action, ...data }) // เพิ่มการล็อกข้อมูลที่ส่งไปยัง API
+      const response = await axios.post('/api/action-price-group', { action, ...data })
+      return response.data
+    } catch (error) {
+      console.error(`Error during ${action}:`, error)
+      throw error
+    }
+  }
+
+  const handleSetChange = async (index, field, value) => {
     setSets(prevSets => prevSets.map((set, i) => (i === index ? { ...set, [field]: value } : set)))
+
+    const currentSet = sets[index]
+    const booking_no = selectedBookingNo
+    const booking_set = index + 1
+    const amount = field === 'quantity' ? value : currentSet.quantity
+    const add_ademgo = field === 'addon1' ? (value ? 1 : 0) : currentSet.addon1 ? 1 : 0
+    const chang_eleph = field === 'addon2' ? (value ? 1 : 0) : currentSet.chang_eleph ? 1 : 0
+    const uni_id = addressData.uni_id
+    const film_no = searchFilm
+
+    try {
+      if (field === 'quantity') {
+        if (value > 0) {
+          // เช็คว่าชุดมีอยู่แล้วหรือไม่
+          const checkResponse = await actionPriceGroup('check', { booking_no, booking_set })
+          const exists = checkResponse.exists
+
+          if (exists) {
+            // อัปเดตชุดที่มีอยู่
+            const updateData = { booking_no, booking_set, amount, add_ademgo, chang_eleph }
+            const updateResponse = await actionPriceGroup('update', updateData)
+            if (updateResponse.success) {
+              showSnackbar('อัปเดตชุดสำเร็จ', 'success')
+            } else {
+              showSnackbar(updateResponse.message || 'อัปเดตชุดไม่สำเร็จ', 'error')
+            }
+          } else {
+            // เพิ่มชุดใหม่
+            const addData = {
+              booking_no,
+              booking_set,
+              amount,
+              typeofsend: bookingResponse.typeofsend, // เปลี่ยนจาก send_type เป็น typeofsend ตามข้อมูลที่มี
+              uni_id,
+              orderid: orderid || 0, // ใช้ orderid จาก state
+              add_ademgo,
+              chang_eleph,
+              film_no
+            }
+            const addResponse = await actionPriceGroup('add', addData)
+            if (addResponse.success) {
+              showSnackbar('เพิ่มชุดสำเร็จ', 'success')
+            } else {
+              showSnackbar(addResponse.message || 'เพิ่มชุดไม่สำเร็จ', 'error')
+            }
+          }
+        } else {
+          // ลบชุดถ้าปริมาณเป็น 0
+          const deleteData = { booking_no, booking_set }
+          const deleteResponse = await actionPriceGroup('delete', deleteData)
+          if (deleteResponse.success) {
+            showSnackbar('ลบชุดสำเร็จ', 'success')
+          } else {
+            showSnackbar(deleteResponse.message || 'ลบชุดไม่สำเร็จ', 'error')
+          }
+        }
+      } else if (field === 'addon1' || field === 'addon2') {
+        if (sets[index].quantity === 0) {
+          // หากไม่มีจำนวน ไม่อนุญาตให้เพิ่มอแด็ม
+          showSnackbar('ต้องมีจำนวนก่อนเพิ่มอแด็ม', 'warning')
+          return
+        }
+        // อัปเดตอแด็ม
+        const updateData = { booking_no, booking_set, amount, add_ademgo, chang_eleph }
+        const updateResponse = await actionPriceGroup('update', updateData)
+        if (updateResponse.success) {
+          showSnackbar('อัปเดตอแด็มสำเร็จ', 'success')
+        } else {
+          showSnackbar(updateResponse.message || 'อัปเดตอแด็มไม่สำเร็จ', 'error')
+        }
+      }
+    } catch (error) {
+      console.error('Error handling set change:', error)
+      showSnackbar('เกิดข้อผิดพลาดในการอัปเดตชุด', 'error')
+    }
   }
 
   const handleTabChange = tab => {
@@ -322,6 +432,7 @@ const ReservationInformation = () => {
 
   const handleSearch = () => {
     console.log('Searching for:', searchFilm)
+    // คุณสามารถเพิ่มฟังก์ชันการค้นหาเพิ่มเติมได้ที่นี่
   }
 
   // เพิ่ม useEffect เพื่อดึง bookingNumbers หลังจาก fetchData เรียบร้อย
@@ -449,8 +560,6 @@ const ReservationInformation = () => {
         update_date: new Date().toISOString()
       }
 
-      console.log('Booking Data to Update:', bookingData) // เพิ่มการล็อกข้อมูล
-
       const response = await axios.post('/api/reservation/booking/updateBooking', bookingData)
 
       if (response.data.success) {
@@ -460,7 +569,7 @@ const ReservationInformation = () => {
       }
     } catch (error) {
       console.error('Error saving booking data:', error)
-      showSnackbar('Error saving booking data', 'error')
+      showSnackbar('Error saving booking data:', 'error')
     }
   }
 
@@ -806,12 +915,12 @@ const ReservationInformation = () => {
         </Grid>
         <Grid item xs={2}>
           <Typography variant='subtitle1' fontWeight='bold'>
-            เพิ่มภาพหมู่
+            กรอบอเด็มโก้
           </Typography>
         </Grid>
         <Grid item xs={2}>
           <Typography variant='subtitle1' fontWeight='bold'>
-            เปลี่ยนสีกรอบ
+            กรอบงาช้าง
           </Typography>
         </Grid>
       </Grid>
@@ -868,6 +977,38 @@ const ReservationInformation = () => {
           </Grid>
         ))}
       </Grid>
+    </Paper>
+  )
+
+  const renderBookedSets = () => (
+    <Paper elevation={3} sx={{ p: 2, mb: 2, width: '100%' }}>
+      <Typography variant='h5' gutterBottom>
+        ชุดที่จองแล้ว
+      </Typography>
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <StyledTableHeadCell>เลขใบจอง</StyledTableHeadCell>
+              <StyledTableHeadCell>ชุดที่</StyledTableHeadCell>
+              <StyledTableHeadCell>จำนวน</StyledTableHeadCell>
+              <StyledTableHeadCell>กรอบอเด็มโก้</StyledTableHeadCell>
+              <StyledTableHeadCell>กรอบงาช้าง</StyledTableHeadCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sets.map((set, index) => (
+              <TableRow key={index}>
+                <TableCell>{selectedBookingNo}</TableCell>
+                <TableCell>{index + 1}</TableCell>
+                <TableCell>{set.quantity}</TableCell>
+                <TableCell>{set.addon1 ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{set.addon2 ? 'Yes' : 'No'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Paper>
   )
 
@@ -968,11 +1109,7 @@ const ReservationInformation = () => {
         <Grid item xs={12} md={6}>
           {activeTab === 'address' && renderBookingForm()}
           {activeTab === 'set' && renderSetForm()}
-          {activeTab === 'additional' && (
-            <Box>
-              <Typography>เนื้อหาในแท็บเพิ่มเติม</Typography>
-            </Box>
-          )}
+          {activeTab === 'additional' && renderBookedSets()}
         </Grid>
       </Grid>
       <Snackbar

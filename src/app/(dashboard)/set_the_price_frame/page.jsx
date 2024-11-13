@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-
 import axios from 'axios'
 import {
   Box,
@@ -14,7 +13,16 @@ import {
   TableHead,
   TableRow,
   Button,
-  Skeleton
+  Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material'
 import { styled } from '@mui/material/styles'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -41,27 +49,57 @@ const StyledButton = styled(Button)(({ theme }) => ({
 export default function SetFramePrice() {
   const [sizes, setSizes] = useState([])
   const [colors, setColors] = useState([])
-  const [categories, setCategories] = useState([])
+  const [frames, setFrames] = useState([])
   const [sets, setSets] = useState([])
   const [activeSection, setActiveSection] = useState('size')
   const [isLoading, setIsLoading] = useState(true)
+
+  const [openModal, setOpenModal] = useState({
+    size: false,
+    color: false,
+    category: false,
+    set: false
+  })
+
+  const [formData, setFormData] = useState({
+    size: '',
+    color: '',
+    category: '',
+    set: {
+      sizeId: '',
+      colorId: '',
+      categoryId: ''
+    }
+  })
 
   useEffect(() => {
     fetchData()
   }, [])
 
   const fetchData = async () => {
+    console.log('fetchData function called')
     setIsLoading(true)
 
     try {
-      const sizeResponse = await axios.get('/api/frame-sizes')
-      const colorResponse = await axios.get('/api/frame-colors')
-      const categoryResponse = await axios.get('/api/frame-categories')
-      const setsResponse = await axios.get('/api/frame-sets')
+      const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
+      const uni_id = selectedUniversity?.uni_id || ''
+      console.log('Selected University:', selectedUniversity)
+      console.log('University ID:', uni_id)
 
-      setSizes(sizeResponse.data.frameSize || [])
+      const sizeResponse = await axios.get(`/api/f_sizeset`)
+      console.log('Size response data:', sizeResponse.data)
+      setSizes(sizeResponse.data.FrameCategory || [])
+
+      const colorResponse = await axios.get(`/api/f_colorset`)
+      console.log('Color response data:', colorResponse.data)
       setColors(colorResponse.data.FrameColor || [])
-      setCategories(categoryResponse.data.FrameCategory || [])
+
+      const frameResponse = await axios.get(`/api/f_frameset`)
+      console.log('Frame response data:', frameResponse.data)
+      setFrames(frameResponse.data.FrameCategory || [])
+
+      const setsResponse = await axios.post(`/api/f_priceset?uni_id=${uni_id}`)
+      console.log('Sets response data:', setsResponse.data)
       setSets(setsResponse.data.FrameSet || [])
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -70,22 +108,24 @@ export default function SetFramePrice() {
     }
   }
 
-  const getNameById = (array, id) => {
+  const getNameById = (array, id, fieldName) => {
     const item = array.find(item => item.id === id)
-
-    return item ? item.name : 'Unknown'
+    return item ? item[fieldName] : 'Unknown'
   }
 
   const handleAdd = type => {
     console.log(`Add new ${type}`)
+    handleOpenModal(type)
   }
 
   const handleEdit = id => {
     console.log(`Edit item with id: ${id}`)
+    // Implement edit functionality here
   }
 
   const handleDelete = id => {
     console.log(`Delete item with id: ${id}`)
+    // Implement delete functionality here
   }
 
   const renderActionButtons = id => (
@@ -115,6 +155,79 @@ export default function SetFramePrice() {
           </StyledTableCell>
         </TableRow>
       ))
+  }
+
+  const handleOpenModal = type => {
+    setOpenModal(prev => ({ ...prev, [type]: true }))
+  }
+
+  const handleCloseModal = type => {
+    setOpenModal(prev => ({ ...prev, [type]: false }))
+    setFormData(prev => ({
+      ...prev,
+      [type]: type !== 'set' ? '' : { sizeId: '', colorId: '', categoryId: '' }
+    }))
+  }
+
+  const handleInputChange = (type, value) => {
+    if (type === 'set') {
+      setFormData(prev => ({
+        ...prev,
+        set: { ...prev.set, ...value }
+      }))
+    } else {
+      setFormData(prev => ({ ...prev, [type]: value }))
+    }
+  }
+
+  const submitAddSize = async () => {
+    try {
+      const response = await axios.post('/api/f_sizeset', { setsizename: formData.size })
+      console.log('Size added:', response.data)
+      setSizes(prev => [...prev, response.data.FrameCategory])
+      handleCloseModal('size')
+    } catch (error) {
+      console.error('Error adding size:', error)
+    }
+  }
+
+  const submitAddColor = async () => {
+    try {
+      const response = await axios.post('/api/f_colorset', { setcolorname: formData.color })
+      console.log('Color added:', response.data)
+      setColors(prev => [...prev, response.data.FrameColor])
+      handleCloseModal('color')
+    } catch (error) {
+      console.error('Error adding color:', error)
+    }
+  }
+
+  const submitAddCategory = async () => {
+    try {
+      const response = await axios.post('/api/f_frameset', { framesetname: formData.category })
+      console.log('Category added:', response.data)
+      setFrames(prev => [...prev, response.data.FrameCategory])
+      handleCloseModal('category')
+    } catch (error) {
+      console.error('Error adding category:', error)
+    }
+  }
+
+  const submitAddSet = async () => {
+    try {
+      const { sizeId, colorId, categoryId } = formData.set
+      const response = await axios.post('/api/f_priceset', {
+        frameSizeId: sizeId,
+        frameColorId: colorId,
+        frameCategoryId: categoryId,
+        uni_id: JSON.parse(sessionStorage.getItem('selectedUniversity'))?.uni_id || ''
+      })
+      console.log('Set added:', response.data)
+      setSets(prev => [...prev, response.data.FrameSet])
+      handleCloseModal('set')
+    } catch (error) {
+      console.error('Error adding set:', error)
+    }
   }
 
   const renderSection = () => {
@@ -169,7 +282,7 @@ export default function SetFramePrice() {
                   {sizes.map((size, index) => (
                     <TableRow key={size.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                       <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{size.name}</StyledTableCell>
+                      <StyledTableCell>{size.setsizename}</StyledTableCell>
                       <StyledTableCell align='right'>{renderActionButtons(size.id)}</StyledTableCell>
                     </TableRow>
                   ))}
@@ -202,7 +315,7 @@ export default function SetFramePrice() {
                   {colors.map((color, index) => (
                     <TableRow key={color.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                       <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{color.name}</StyledTableCell>
+                      <StyledTableCell>{color.setcolorname}</StyledTableCell>
                       <StyledTableCell align='right'>{renderActionButtons(color.id)}</StyledTableCell>
                     </TableRow>
                   ))}
@@ -232,11 +345,11 @@ export default function SetFramePrice() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {categories.map((category, index) => (
-                    <TableRow key={category.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                  {frames.map((frame, index) => (
+                    <TableRow key={frame.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                       <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{category.name}</StyledTableCell>
-                      <StyledTableCell align='right'>{renderActionButtons(categories.id)}</StyledTableCell>
+                      <StyledTableCell>{frame.framesetname}</StyledTableCell>
+                      <StyledTableCell align='right'>{renderActionButtons(frame.id)}</StyledTableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -270,9 +383,9 @@ export default function SetFramePrice() {
                   {sets.map((set, index) => (
                     <TableRow key={set.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                       <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{getNameById(sizes, set.frameSizeId)}</StyledTableCell>
-                      <StyledTableCell>{getNameById(colors, set.frameColorId)}</StyledTableCell>
-                      <StyledTableCell>{getNameById(categories, set.frameCategoryId)}</StyledTableCell>
+                      <StyledTableCell>{getNameById(sizes, set.frameSizeId, 'setsizename')}</StyledTableCell>
+                      <StyledTableCell>{getNameById(colors, set.frameColorId, 'setcolorname')}</StyledTableCell>
+                      <StyledTableCell>{getNameById(frames, set.frameCategoryId, 'framesetname')}</StyledTableCell>
                       <StyledTableCell align='right'>{renderActionButtons(set.id)}</StyledTableCell>
                     </TableRow>
                   ))}
@@ -285,6 +398,131 @@ export default function SetFramePrice() {
         return null
     }
   }
+
+  const AddSizeModal = () => (
+    <Dialog open={openModal.size} onClose={() => handleCloseModal('size')}>
+      <DialogTitle>Add New Size</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          margin='dense'
+          label='Size Name'
+          fullWidth
+          value={formData.size}
+          onChange={e => handleInputChange('size', e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => handleCloseModal('size')}>Cancel</Button>
+        <Button onClick={submitAddSize} variant='contained' color='primary'>
+          Add
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+
+  const AddColorModal = () => (
+    <Dialog open={openModal.color} onClose={() => handleCloseModal('color')}>
+      <DialogTitle>Add New Color</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          margin='dense'
+          label='Color Name'
+          fullWidth
+          value={formData.color}
+          onChange={e => handleInputChange('color', e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => handleCloseModal('color')}>Cancel</Button>
+        <Button onClick={submitAddColor} variant='contained' color='primary'>
+          Add
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+
+  const AddCategoryModal = () => (
+    <Dialog open={openModal.category} onClose={() => handleCloseModal('category')}>
+      <DialogTitle>Add New Category</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          margin='dense'
+          label='Category Name'
+          fullWidth
+          value={formData.category}
+          onChange={e => handleInputChange('category', e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => handleCloseModal('category')}>Cancel</Button>
+        <Button onClick={submitAddCategory} variant='contained' color='primary'>
+          Add
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+
+  const AddSetModal = () => (
+    <Dialog open={openModal.set} onClose={() => handleCloseModal('set')}>
+      <DialogTitle>Add New Set</DialogTitle>
+      <DialogContent>
+        <FormControl fullWidth margin='dense'>
+          <InputLabel id='size-select-label'>Size</InputLabel>
+          <Select
+            labelId='size-select-label'
+            value={formData.set.sizeId}
+            label='Size'
+            onChange={e => handleInputChange('set', { sizeId: e.target.value })}
+          >
+            {sizes.map(size => (
+              <MenuItem key={size.id} value={size.id}>
+                {size.setsizename}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin='dense'>
+          <InputLabel id='color-select-label'>Color</InputLabel>
+          <Select
+            labelId='color-select-label'
+            value={formData.set.colorId}
+            label='Color'
+            onChange={e => handleInputChange('set', { colorId: e.target.value })}
+          >
+            {colors.map(color => (
+              <MenuItem key={color.id} value={color.id}>
+                {color.setcolorname}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth margin='dense'>
+          <InputLabel id='category-select-label'>Category</InputLabel>
+          <Select
+            labelId='category-select-label'
+            value={formData.set.categoryId}
+            label='Category'
+            onChange={e => handleInputChange('set', { categoryId: e.target.value })}
+          >
+            {frames.map(frame => (
+              <MenuItem key={frame.id} value={frame.id}>
+                {frame.framesetname}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => handleCloseModal('set')}>Cancel</Button>
+        <Button onClick={submitAddSet} variant='contained' color='primary'>
+          Add
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
 
   return (
     <Box p={4}>
@@ -336,6 +574,12 @@ export default function SetFramePrice() {
         )}
       </Box>
       {renderSection()}
+
+      {/* Modals */}
+      <AddSizeModal />
+      <AddColorModal />
+      <AddCategoryModal />
+      <AddSetModal />
     </Box>
   )
 }

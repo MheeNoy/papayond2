@@ -235,8 +235,7 @@ const RecordFilmAndReservation = () => {
 
       // Get uni_id from sessionStorage or searchParams
       const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
-      const uni_id = selectedUniversity?.uni_id || searchParams.get('uni_id')
-
+      const uni_id = selectedUniversity?.uni_id
       // Find the current university data
       const currentUniversity = universities.find(u => u.id.toString() === id && u.booking_no === original_booking_no)
       if (!currentUniversity) {
@@ -275,11 +274,12 @@ const RecordFilmAndReservation = () => {
       })
 
       // Show success snackbar
-      setSnackbar({ open: true, message: 'Reservation updated successfully.', severity: 'success' })
+      setSnackbar({ open: true, message: 'บันทึกรายการสำเร็จ.', severity: 'success' })
     } catch (error) {
-      console.error('Error updating reservation:', error.response ? error.response.data : error.message)
+      console.log('uno_id', uni_id)
+      console.error('เกิดปัญหาขัดข้องในการบันทึกรายการ', error.response ? error.response.data : error.message)
       // Show error snackbar
-      setSnackbar({ open: true, message: 'Failed to update reservation.', severity: 'error' })
+      setSnackbar({ open: true, message: 'บันทึกรายการไม่สำเร็จ.', severity: 'error' })
     } finally {
       setSavingKeys(prev => prev.filter(savingKey => savingKey !== uniqueKey)) // Remove uniqueKey from savingKeys
     }
@@ -306,7 +306,7 @@ const RecordFilmAndReservation = () => {
   return (
     <Box sx={{ width: '100%', maxWidth: 1200, margin: 'auto', p: 2 }}>
       <Typography variant='h4' component='h1' gutterBottom>
-        Order List
+        บันทึกเลขฟิล์มและใบจอง
       </Typography>
       {error && (
         <Typography color='error' align='center'>
@@ -460,7 +460,7 @@ const RecordFilmAndReservation = () => {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
         <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
