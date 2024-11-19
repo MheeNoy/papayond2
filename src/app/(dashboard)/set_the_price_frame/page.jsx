@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, memo } from 'react'
 import axios from 'axios'
 import {
   Box,
@@ -22,7 +22,10 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Alert,
+  Snackbar,
+  Pagination
 } from '@mui/material'
 import { styled } from '@mui/material/styles'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -46,6 +49,365 @@ const StyledButton = styled(Button)(({ theme }) => ({
   minWidth: 'auto'
 }))
 
+// Memoized Modal Components with Error Handling
+const AddSizeModal = memo(({ open, onClose, onAdd, sizeValue, onChange, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>เพิ่มขนาดใหม่</DialogTitle>
+    <DialogContent>
+      <TextField
+        autoFocus
+        margin='dense'
+        label='ชื่อขนาด'
+        fullWidth
+        value={sizeValue}
+        onChange={e => onChange(e.target.value)}
+        error={Boolean(error)}
+        helperText={error}
+      />
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onAdd} variant='contained' color='primary'>
+        เพิ่ม
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+const AddColorModal = memo(({ open, onClose, onAdd, colorValue, onChange, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>เพิ่มสีใหม่</DialogTitle>
+    <DialogContent>
+      <TextField
+        autoFocus
+        margin='dense'
+        label='ชื่อสี'
+        fullWidth
+        value={colorValue}
+        onChange={e => onChange(e.target.value)}
+        error={Boolean(error)}
+        helperText={error}
+      />
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onAdd} variant='contained' color='primary'>
+        เพิ่ม
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+const AddCategoryModal = memo(({ open, onClose, onAdd, categoryValue, onChange, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>เพิ่มหมวดหมู่ใหม่</DialogTitle>
+    <DialogContent>
+      <TextField
+        autoFocus
+        margin='dense'
+        label='ชื่อหมวดหมู่'
+        fullWidth
+        value={categoryValue}
+        onChange={e => onChange(e.target.value)}
+        error={Boolean(error)}
+        helperText={error}
+      />
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onAdd} variant='contained' color='primary'>
+        เพิ่ม
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+const AddSetModal = memo(({ open, onClose, onAdd, setData, onChange, sizes, colors, categories, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>เพิ่มชุดใหม่</DialogTitle>
+    <DialogContent>
+      <FormControl fullWidth margin='dense' error={Boolean(error?.sizeId)}>
+        <InputLabel id='size-select-label'>ขนาด</InputLabel>
+        <Select
+          labelId='size-select-label'
+          value={setData.sizeId}
+          label='ขนาด'
+          onChange={e => onChange({ sizeId: e.target.value })}
+        >
+          {sizes.map(size => (
+            <MenuItem key={size.id} value={size.id}>
+              {size.setsizename}
+            </MenuItem>
+          ))}
+        </Select>
+        {error?.sizeId && (
+          <Typography variant='caption' color='error'>
+            {error.sizeId}
+          </Typography>
+        )}
+      </FormControl>
+      <FormControl fullWidth margin='dense' error={Boolean(error?.colorId)}>
+        <InputLabel id='color-select-label'>สี</InputLabel>
+        <Select
+          labelId='color-select-label'
+          value={setData.colorId}
+          label='สี'
+          onChange={e => onChange({ colorId: e.target.value })}
+        >
+          {colors.map(color => (
+            <MenuItem key={color.id} value={color.id}>
+              {color.setcolorname}
+            </MenuItem>
+          ))}
+        </Select>
+        {error?.colorId && (
+          <Typography variant='caption' color='error'>
+            {error.colorId}
+          </Typography>
+        )}
+      </FormControl>
+      <FormControl fullWidth margin='dense' error={Boolean(error?.categoryId)}>
+        <InputLabel id='category-select-label'>หมวดหมู่</InputLabel>
+        <Select
+          labelId='category-select-label'
+          value={setData.categoryId}
+          label='หมวดหมู่'
+          onChange={e => onChange({ categoryId: e.target.value })}
+        >
+          {categories.map(category => (
+            <MenuItem key={category.id} value={category.id}>
+              {category.framesetname}
+            </MenuItem>
+          ))}
+        </Select>
+        {error?.categoryId && (
+          <Typography variant='caption' color='error'>
+            {error.categoryId}
+          </Typography>
+        )}
+      </FormControl>
+      {/* เพิ่มฟิลด์สำหรับกรอกราคา */}
+      <TextField
+        margin='dense'
+        label='ราคา'
+        type='number'
+        fullWidth
+        value={setData.price || ''}
+        onChange={e => onChange({ price: e.target.value })}
+        error={Boolean(error?.price)}
+        helperText={error?.price}
+      />
+      {error?.general && (
+        <Alert severity='error' sx={{ mt: 2 }}>
+          {error.general}
+        </Alert>
+      )}
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onAdd} variant='contained' color='primary'>
+        เพิ่ม
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+// Delete Confirmation Modal
+const DeleteConfirmModal = memo(({ open, onClose, onConfirm, title, content }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>{title}</DialogTitle>
+    <DialogContent>
+      <Typography>{content}</Typography>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onConfirm} variant='contained' color='error'>
+        ลบ
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+// Edit Size Modal
+const EditSizeModal = memo(({ open, onClose, onUpdate, sizeData, onChange, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>แก้ไขขนาด</DialogTitle>
+    <DialogContent>
+      <TextField
+        autoFocus
+        margin='dense'
+        label='ชื่อขนาด'
+        fullWidth
+        value={sizeData.setsizename}
+        onChange={e => onChange({ setsizename: e.target.value })}
+        error={Boolean(error)}
+        helperText={error}
+      />
+      {error?.general && (
+        <Alert severity='error' sx={{ mt: 2 }}>
+          {error.general}
+        </Alert>
+      )}
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onUpdate} variant='contained' color='primary'>
+        อัปเดต
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+// Edit Color Modal
+const EditColorModal = memo(({ open, onClose, onUpdate, colorData, onChange, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>แก้ไขสี</DialogTitle>
+    <DialogContent>
+      <TextField
+        autoFocus
+        margin='dense'
+        label='ชื่อสี'
+        fullWidth
+        value={colorData.setcolorname}
+        onChange={e => onChange({ setcolorname: e.target.value })}
+        error={Boolean(error)}
+        helperText={error}
+      />
+      {error?.general && (
+        <Alert severity='error' sx={{ mt: 2 }}>
+          {error.general}
+        </Alert>
+      )}
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onUpdate} variant='contained' color='primary'>
+        อัปเดต
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+// Edit Frame Category Modal
+const EditFrameCategoryModal = memo(({ open, onClose, onUpdate, categoryData, onChange, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>แก้ไขกรอบ</DialogTitle>
+    <DialogContent>
+      <TextField
+        autoFocus
+        margin='dense'
+        label='ชื่อหมวดหมู่'
+        fullWidth
+        value={categoryData.framesetname}
+        onChange={e => onChange({ framesetname: e.target.value })}
+        error={Boolean(error)}
+        helperText={error}
+      />
+      {error?.general && (
+        <Alert severity='error' sx={{ mt: 2 }}>
+          {error.general}
+        </Alert>
+      )}
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onUpdate} variant='contained' color='primary'>
+        อัปเดต
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
+// Edit Set Modal
+const EditSetModal = memo(({ open, onClose, onUpdate, setData, sizes, colors, categories, error }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>แก้ไขชุด</DialogTitle>
+    <DialogContent>
+      <FormControl fullWidth margin='dense' error={Boolean(error?.sizeId)}>
+        <InputLabel id='edit-size-select-label'>ขนาด</InputLabel>
+        <Select
+          labelId='edit-size-select-label'
+          value={setData.sizeId}
+          label='ขนาด'
+          onChange={e => onUpdate({ sizeId: e.target.value })}
+        >
+          {sizes.map(size => (
+            <MenuItem key={size.id} value={size.id}>
+              {size.setsizename}
+            </MenuItem>
+          ))}
+        </Select>
+        {error?.sizeId && (
+          <Typography variant='caption' color='error'>
+            {error.sizeId}
+          </Typography>
+        )}
+      </FormControl>
+      <FormControl fullWidth margin='dense' error={Boolean(error?.colorId)}>
+        <InputLabel id='edit-color-select-label'>สี</InputLabel>
+        <Select
+          labelId='edit-color-select-label'
+          value={setData.colorId}
+          label='สี'
+          onChange={e => onUpdate({ colorId: e.target.value })}
+        >
+          {colors.map(color => (
+            <MenuItem key={color.id} value={color.id}>
+              {color.setcolorname}
+            </MenuItem>
+          ))}
+        </Select>
+        {error?.colorId && (
+          <Typography variant='caption' color='error'>
+            {error.colorId}
+          </Typography>
+        )}
+      </FormControl>
+      <FormControl fullWidth margin='dense' error={Boolean(error?.categoryId)}>
+        <InputLabel id='edit-category-select-label'>หมวดหมู่</InputLabel>
+        <Select
+          labelId='edit-category-select-label'
+          value={setData.categoryId}
+          label='หมวดหมู่'
+          onChange={e => onUpdate({ categoryId: e.target.value })}
+        >
+          {categories.map(category => (
+            <MenuItem key={category.id} value={category.id}>
+              {category.framesetname}
+            </MenuItem>
+          ))}
+        </Select>
+        {error?.categoryId && (
+          <Typography variant='caption' color='error'>
+            {error.categoryId}
+          </Typography>
+        )}
+      </FormControl>
+      <TextField
+        margin='dense'
+        label='ราคา'
+        type='number'
+        fullWidth
+        value={setData.priceset_single || ''}
+        onChange={e => onUpdate({ priceset_single: e.target.value })}
+        error={Boolean(error?.priceset_single)}
+        helperText={error?.priceset_single}
+      />
+      {error?.general && (
+        <Alert severity='error' sx={{ mt: 2 }}>
+          {error.general}
+        </Alert>
+      )}
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>ยกเลิก</Button>
+      <Button onClick={onUpdate} variant='contained' color='primary'>
+        อัปเดต
+      </Button>
+    </DialogActions>
+  </Dialog>
+))
+
 export default function SetFramePrice() {
   const [sizes, setSizes] = useState([])
   const [colors, setColors] = useState([])
@@ -54,13 +416,23 @@ export default function SetFramePrice() {
   const [activeSection, setActiveSection] = useState('size')
   const [isLoading, setIsLoading] = useState(true)
 
-  const [openModal, setOpenModal] = useState({
-    size: false,
-    color: false,
-    category: false,
-    set: false
-  })
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const limit = 10 // สามารถปรับได้ตามต้องการ
 
+  // Separate state for each modal
+  const [openSizeModal, setOpenSizeModal] = useState(false)
+  const [openColorModal, setOpenColorModal] = useState(false)
+  const [openCategoryModal, setOpenCategoryModal] = useState(false)
+  const [openSetModal, setOpenSetModal] = useState(false)
+  const [openEditSizeModal, setOpenEditSizeModal] = useState(false)
+  const [openEditColorModal, setOpenEditColorModal] = useState(false)
+  const [openEditFrameCategoryModal, setOpenEditFrameCategoryModal] = useState(false)
+  const [openEditSetModal, setOpenEditSetModal] = useState(false)
+  const [openDeleteModal, setOpenDeleteModal] = useState(false)
+
+  // Form data state
   const [formData, setFormData] = useState({
     size: '',
     color: '',
@@ -68,73 +440,235 @@ export default function SetFramePrice() {
     set: {
       sizeId: '',
       colorId: '',
-      categoryId: ''
+      categoryId: '',
+      price: '' // เพิ่มฟิลด์สำหรับราคา
     }
   })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  // Current items being edited
+  const [currentEditSize, setCurrentEditSize] = useState(null)
+  const [currentEditColor, setCurrentEditColor] = useState(null)
+  const [currentEditFrameCategory, setCurrentEditFrameCategory] = useState(null)
+  const [currentEditSet, setCurrentEditSet] = useState(null) // เพิ่ม state สำหรับ set
 
-  const fetchData = async () => {
-    console.log('fetchData function called')
+  // ID and type of the item targeted for deletion
+  const [deleteTargetId, setDeleteTargetId] = useState(null)
+  const [deleteTargetType, setDeleteTargetType] = useState(null) // 'size' | 'color' | 'category' | 'set'
+
+  // Error states for modals
+  const [sizeError, setSizeError] = useState('')
+  const [colorError, setColorError] = useState('')
+  const [categoryError, setCategoryError] = useState('')
+  const [setError, setSetError] = useState({})
+  const [editSizeError, setEditSizeError] = useState('')
+  const [editColorError, setEditColorError] = useState('')
+  const [editFrameCategoryError, setEditFrameCategoryError] = useState('')
+  const [editSetError, setEditSetError] = useState({}) // เพิ่ม error state สำหรับ set
+
+  // Snackbar state for notifications
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' // 'success' | 'error' | 'warning' | 'info'
+  })
+
+  useEffect(() => {
+    fetchData(currentPage)
+  }, [currentPage])
+
+  const fetchData = async (page = 1) => {
     setIsLoading(true)
 
     try {
       const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
       const uni_id = selectedUniversity?.uni_id || ''
-      console.log('Selected University:', selectedUniversity)
-      console.log('University ID:', uni_id)
 
+      // Fetch sizes
       const sizeResponse = await axios.get(`/api/f_sizeset`)
-      console.log('Size response data:', sizeResponse.data)
       setSizes(sizeResponse.data.FrameCategory || [])
 
+      // Fetch colors
       const colorResponse = await axios.get(`/api/f_colorset`)
-      console.log('Color response data:', colorResponse.data)
       setColors(colorResponse.data.FrameColor || [])
 
+      // Fetch frame categories
       const frameResponse = await axios.get(`/api/f_frameset`)
-      console.log('Frame response data:', frameResponse.data)
       setFrames(frameResponse.data.FrameCategory || [])
 
-      const setsResponse = await axios.post(`/api/f_priceset?uni_id=${uni_id}`)
-      console.log('Sets response data:', setsResponse.data)
-      setSets(setsResponse.data.FrameSet || [])
+      // Fetch sets with pagination
+      const setsResponse = await axios.get(`/api/f_priceset`, {
+        params: { uni_id, page, limit }
+      })
+      setSets(setsResponse.data.FrameSets || [])
+      setTotalPages(setsResponse.data.pagination.totalPages || 1)
     } catch (error) {
-      console.error('Error fetching data:', error)
+      setSnackbar({
+        open: true,
+        message: 'เกิดข้อผิดพลาดในการดึงข้อมูลจากเซิร์ฟเวอร์',
+        severity: 'error'
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
-  const getNameById = (array, id, fieldName) => {
-    const item = array.find(item => item.id === id)
-    return item ? item[fieldName] : 'Unknown'
-  }
-
   const handleAdd = type => {
-    console.log(`Add new ${type}`)
-    handleOpenModal(type)
+    switch (type) {
+      case 'size':
+        setOpenSizeModal(true)
+        break
+      case 'color':
+        setOpenColorModal(true)
+        break
+      case 'category':
+        setOpenCategoryModal(true)
+        break
+      case 'set':
+        setOpenSetModal(true)
+        break
+      default:
+        break
+    }
   }
 
-  const handleEdit = id => {
-    console.log(`Edit item with id: ${id}`)
-    // Implement edit functionality here
+  // Handle Edit: Open Edit Modal with selected item's data
+  const handleEdit = (id, type) => {
+    switch (type) {
+      case 'size':
+        const sizeToEdit = sizes.find(size => size.id === id)
+        if (!sizeToEdit) {
+          setSnackbar({
+            open: true,
+            message: 'ไม่พบขนาดที่เลือก',
+            severity: 'error'
+          })
+          return
+        }
+        setCurrentEditSize(sizeToEdit)
+        setOpenEditSizeModal(true)
+        break
+      case 'color':
+        const colorToEdit = colors.find(color => color.id === id)
+        if (!colorToEdit) {
+          setSnackbar({
+            open: true,
+            message: 'ไม่พบสีที่เลือก',
+            severity: 'error'
+          })
+          return
+        }
+        setCurrentEditColor(colorToEdit)
+        setOpenEditColorModal(true)
+        break
+      case 'category':
+        const categoryToEdit = frames.find(category => category.id === id)
+        if (!categoryToEdit) {
+          setSnackbar({
+            open: true,
+            message: 'ไม่พบกรอบที่เลือก',
+            severity: 'error'
+          })
+          return
+        }
+        setCurrentEditFrameCategory(categoryToEdit)
+        setOpenEditFrameCategoryModal(true)
+        break
+      case 'set':
+        const setToEdit = sets.find(set => set.id === id)
+        if (!setToEdit) {
+          setSnackbar({
+            open: true,
+            message: 'ไม่พบชุดที่เลือก',
+            severity: 'error'
+          })
+          return
+        }
+        setCurrentEditSet(setToEdit)
+        setOpenEditSetModal(true)
+        break
+      default:
+        break
+    }
   }
 
-  const handleDelete = id => {
-    console.log(`Delete item with id: ${id}`)
-    // Implement delete functionality here
+  // Handle Delete: Open Delete Confirmation Modal
+  const handleDelete = (id, type) => {
+    setDeleteTargetId(id)
+    setDeleteTargetType(type)
+    setOpenDeleteModal(true)
   }
 
-  const renderActionButtons = id => (
+  // Confirm Delete
+  const confirmDelete = async () => {
+    if (!deleteTargetId || !deleteTargetType) return
+
+    try {
+      if (deleteTargetType === 'size') {
+        await axios.delete(`/api/f_sizeset`, { data: { id: deleteTargetId } })
+        setSizes(prev => prev.filter(size => size.id !== deleteTargetId))
+        setSnackbar({
+          open: true,
+          message: 'ขนาดถูกลบเรียบร้อยแล้ว!',
+          severity: 'success'
+        })
+      } else if (deleteTargetType === 'color') {
+        await axios.delete(`/api/f_colorset`, { data: { id: deleteTargetId } })
+        setColors(prev => prev.filter(color => color.id !== deleteTargetId))
+        setSnackbar({
+          open: true,
+          message: 'สีถูกลบเรียบร้อยแล้ว!',
+          severity: 'success'
+        })
+      } else if (deleteTargetType === 'category') {
+        await axios.delete(`/api/f_frameset`, { data: { id: deleteTargetId } })
+        setFrames(prev => prev.filter(category => category.id !== deleteTargetId))
+        setSnackbar({
+          open: true,
+          message: 'กรอบถูกลบเรียบร้อยแล้ว!',
+          severity: 'success'
+        })
+      } else if (deleteTargetType === 'set') {
+        // เพิ่มกรณีสำหรับ 'set'
+        await axios.delete(`/api/f_priceset`, { data: { id: deleteTargetId } })
+        setSets(prev => prev.filter(set => set.id !== deleteTargetId))
+        setSnackbar({
+          open: true,
+          message: 'ชุดถูกลบเรียบร้อยแล้ว!',
+          severity: 'success'
+        })
+      }
+
+      // Reset delete target and close modal
+      setDeleteTargetId(null)
+      setDeleteTargetType(null)
+      setOpenDeleteModal(false)
+    } catch (error) {
+      let message = 'เกิดข้อผิดพลาดในการลบข้อมูล'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      // Show error snackbar
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
+
+      // Optionally, reset delete target and close modal
+      setDeleteTargetId(null)
+      setDeleteTargetType(null)
+      setOpenDeleteModal(false)
+    }
+  }
+
+  const renderActionButtons = (id, type) => (
     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-      <StyledButton variant='contained' color='primary' onClick={() => handleEdit(id)}>
+      <StyledButton variant='contained' color='primary' onClick={() => handleEdit(id, type)}>
         <SettingsIcon />
       </StyledButton>
-      <StyledButton variant='contained' color='error' onClick={() => handleDelete(id)}>
-        Delete
+      <StyledButton variant='contained' color='error' onClick={() => handleDelete(id, type)}>
+        ลบ
       </StyledButton>
     </Box>
   )
@@ -150,23 +684,20 @@ export default function SetFramePrice() {
           <StyledTableCell>
             <Skeleton animation='wave' />
           </StyledTableCell>
+          <StyledTableCell>
+            <Skeleton animation='wave' />
+          </StyledTableCell>
+          <StyledTableCell>
+            <Skeleton animation='wave' />
+          </StyledTableCell>
+          <StyledTableCell>
+            <Skeleton animation='wave' />
+          </StyledTableCell>
           <StyledTableCell align='right'>
             <Skeleton animation='wave' width={100} />
           </StyledTableCell>
         </TableRow>
       ))
-  }
-
-  const handleOpenModal = type => {
-    setOpenModal(prev => ({ ...prev, [type]: true }))
-  }
-
-  const handleCloseModal = type => {
-    setOpenModal(prev => ({ ...prev, [type]: false }))
-    setFormData(prev => ({
-      ...prev,
-      [type]: type !== 'set' ? '' : { sizeId: '', colorId: '', categoryId: '' }
-    }))
   }
 
   const handleInputChange = (type, value) => {
@@ -180,53 +711,381 @@ export default function SetFramePrice() {
     }
   }
 
+  // Submit Functions with Enhanced Error Handling
   const submitAddSize = async () => {
     try {
+      // Reset previous error
+      setSizeError('')
+
+      if (!formData.size.trim()) {
+        setSizeError('ชื่อขนาดไม่สามารถเว้นว่างได้')
+        return
+      }
+
       const response = await axios.post('/api/f_sizeset', { setsizename: formData.size })
-      console.log('Size added:', response.data)
       setSizes(prev => [...prev, response.data.FrameCategory])
-      handleCloseModal('size')
+      setFormData(prev => ({ ...prev, size: '' }))
+      setOpenSizeModal(false)
+
+      // Show success snackbar
+      setSnackbar({
+        open: true,
+        message: 'เพิ่มขนาดเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
     } catch (error) {
-      console.error('Error adding size:', error)
+      // Determine error message
+      let message = 'เกิดข้อผิดพลาดในการเพิ่มขนาด'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      // Set error state
+      setSizeError(message)
+
+      // Show error snackbar
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
     }
   }
 
   const submitAddColor = async () => {
     try {
+      setColorError('')
+
+      if (!formData.color.trim()) {
+        setColorError('ชื่อสีไม่สามารถเว้นว่างได้')
+        return
+      }
+
       const response = await axios.post('/api/f_colorset', { setcolorname: formData.color })
-      console.log('Color added:', response.data)
       setColors(prev => [...prev, response.data.FrameColor])
-      handleCloseModal('color')
+      setFormData(prev => ({ ...prev, color: '' }))
+      setOpenColorModal(false)
+
+      setSnackbar({
+        open: true,
+        message: 'เพิ่มสีเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
     } catch (error) {
-      console.error('Error adding color:', error)
+      let message = 'เกิดข้อผิดพลาดในการเพิ่มสี'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      setColorError(message)
+
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
     }
   }
 
   const submitAddCategory = async () => {
     try {
+      setCategoryError('')
+
+      if (!formData.category.trim()) {
+        setCategoryError('ชื่อหมวดหมู่ไม่สามารถเว้นว่างได้')
+        return
+      }
+
       const response = await axios.post('/api/f_frameset', { framesetname: formData.category })
-      console.log('Category added:', response.data)
       setFrames(prev => [...prev, response.data.FrameCategory])
-      handleCloseModal('category')
+      setFormData(prev => ({ ...prev, category: '' }))
+      setOpenCategoryModal(false)
+
+      setSnackbar({
+        open: true,
+        message: 'เพิ่มกรอบเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
     } catch (error) {
-      console.error('Error adding category:', error)
+      let message = 'เกิดข้อผิดพลาดในการเพิ่มหมวดหมู่'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      setCategoryError(message)
+
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
     }
   }
 
   const submitAddSet = async () => {
     try {
-      const { sizeId, colorId, categoryId } = formData.set
+      setSetError({})
+
+      const { sizeId, colorId, categoryId, price } = formData.set
+
+      // Basic validation
+      const errors = {}
+      if (!sizeId) errors.sizeId = 'ขนาดเป็นข้อมูลที่จำเป็น'
+      if (!colorId) errors.colorId = 'สีเป็นข้อมูลที่จำเป็น'
+      if (!categoryId) errors.categoryId = 'หมวดหมู่เป็นข้อมูลที่จำเป็น'
+      if (!price) errors.price = 'ราคาถูกต้องเป็นข้อมูลที่จำเป็น'
+      else if (price <= 0) errors.price = 'ราคาต้องเป็นค่าบวก'
+
+      if (Object.keys(errors).length > 0) {
+        setSetError(errors)
+        return
+      }
+
       const response = await axios.post('/api/f_priceset', {
         frameSizeId: sizeId,
         frameColorId: colorId,
         frameCategoryId: categoryId,
+        priceset_single: parseFloat(price), // ส่งราคาที่เป็นตัวเลข
         uni_id: JSON.parse(sessionStorage.getItem('selectedUniversity'))?.uni_id || ''
       })
-      console.log('Set added:', response.data)
       setSets(prev => [...prev, response.data.FrameSet])
-      handleCloseModal('set')
+      setFormData(prev => ({
+        ...prev,
+        set: { sizeId: '', colorId: '', categoryId: '', price: '' }
+      }))
+      setOpenSetModal(false)
+
+      setSnackbar({
+        open: true,
+        message: 'เพิ่มชุดเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
+
+      // Optionally, refetch data to ensure pagination is updated
+      fetchData(currentPage)
     } catch (error) {
-      console.error('Error adding set:', error)
+      let message = 'เกิดข้อผิดพลาดในการเพิ่มชุด'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      setSetError({ general: message })
+
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
+    }
+  }
+
+  // Submit Update Size
+  const submitUpdateSize = async () => {
+    try {
+      // Reset previous errors
+      setEditSizeError('')
+
+      const { id, setsizename } = currentEditSize
+
+      // Basic validation
+      if (!setsizename.trim()) {
+        setEditSizeError('ชื่อขนาดไม่สามารถเว้นว่างได้')
+        return
+      }
+
+      // Send PUT request to update the size
+      const response = await axios.put('/api/f_sizeset', {
+        id,
+        setsizename: setsizename.trim()
+      })
+
+      // Update the local state
+      setSizes(prev => prev.map(size => (size.id === id ? response.data.FrameCategory : size)))
+
+      // Reset form and close modal
+      setCurrentEditSize(null)
+      setOpenEditSizeModal(false)
+
+      // Show success snackbar
+      setSnackbar({
+        open: true,
+        message: 'แก้ไขขนาดเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
+    } catch (error) {
+      let message = 'เกิดข้อผิดพลาดในการแก้ไขขนาด'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      setEditSizeError(message)
+
+      // Show error snackbar
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
+    }
+  }
+
+  // Submit Update Color
+  const submitUpdateColor = async () => {
+    try {
+      // Reset previous errors
+      setEditColorError('')
+
+      const { id, setcolorname } = currentEditColor
+
+      // Basic validation
+      if (!setcolorname.trim()) {
+        setEditColorError('ชื่อสีไม่สามารถเว้นว่างได้')
+        return
+      }
+
+      // Send PUT request to update the color
+      const response = await axios.put('/api/f_colorset', {
+        id,
+        setcolorname: setcolorname.trim()
+      })
+
+      // Update the local state
+      setColors(prev => prev.map(color => (color.id === id ? response.data.FrameColor : color)))
+
+      // Reset form and close modal
+      setCurrentEditColor(null)
+      setOpenEditColorModal(false)
+
+      // Show success snackbar
+      setSnackbar({
+        open: true,
+        message: 'แก้ไขสีเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
+    } catch (error) {
+      let message = 'เกิดข้อผิดพลาดในการแก้ไขสี'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      setEditColorError(message)
+
+      // Show error snackbar
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
+    }
+  }
+
+  // Submit Update Frame Category
+  const submitUpdateFrameCategory = async () => {
+    try {
+      // Reset previous errors
+      setEditFrameCategoryError('')
+
+      const { id, framesetname } = currentEditFrameCategory
+
+      // Basic validation
+      if (!framesetname.trim()) {
+        setEditFrameCategoryError('ชื่อหมวดหมู่ไม่สามารถเว้นว่างได้')
+        return
+      }
+
+      // Send PUT request to update the frame category
+      const response = await axios.put('/api/f_frameset', {
+        id,
+        framesetname: framesetname.trim()
+      })
+
+      // Update the local state
+      setFrames(prev => prev.map(category => (category.id === id ? response.data.FrameCategory : category)))
+
+      // Reset form and close modal
+      setCurrentEditFrameCategory(null)
+      setOpenEditFrameCategoryModal(false)
+
+      // Show success snackbar
+      setSnackbar({
+        open: true,
+        message: 'แก้ไขกรอบเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
+    } catch (error) {
+      let message = 'เกิดข้อผิดพลาดในการแก้ไขกรอบ'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      setEditFrameCategoryError(message)
+
+      // Show error snackbar
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
+    }
+  }
+
+  // Submit Update Frame Set
+  const submitUpdateSet = async () => {
+    try {
+      // Reset previous errors
+      setEditSetError({})
+
+      const { id, sizeId, colorId, categoryId, priceset_single } = currentEditSet
+
+      // Basic validation
+      const errors = {}
+      if (!sizeId) errors.sizeId = 'ขนาดเป็นข้อมูลที่จำเป็น'
+      if (!colorId) errors.colorId = 'สีเป็นข้อมูลที่จำเป็น'
+      if (!categoryId) errors.categoryId = 'หมวดหมู่เป็นข้อมูลที่จำเป็น'
+      if (!priceset_single) errors.priceset_single = 'ราคาถูกต้องเป็นข้อมูลที่จำเป็น'
+      else if (priceset_single <= 0) errors.priceset_single = 'ราคาต้องเป็นค่าบวก'
+
+      if (Object.keys(errors).length > 0) {
+        setEditSetError(errors)
+        return
+      }
+
+      // Send PUT request to update the set
+      const response = await axios.put('/api/f_priceset', {
+        id,
+        frameSizeId: sizeId,
+        frameColorId: colorId,
+        frameCategoryId: categoryId,
+        priceset_single: parseFloat(priceset_single)
+      })
+
+      // Update the local state
+      setSets(prev => prev.map(set => (set.id === id ? response.data.FrameSet : set)))
+
+      // Reset form and close modal
+      setCurrentEditSet(null)
+      setOpenEditSetModal(false)
+
+      // Show success snackbar
+      setSnackbar({
+        open: true,
+        message: 'แก้ไขชุดเรียบร้อยแล้ว!',
+        severity: 'success'
+      })
+    } catch (error) {
+      let message = 'เกิดข้อผิดพลาดในการแก้ไขชุด'
+      if (error.response && error.response.data && error.response.data.error) {
+        message = error.response.data.error
+      }
+
+      setEditSetError({ general: message })
+
+      // Show error snackbar
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'error'
+      })
     }
   }
 
@@ -239,6 +1098,15 @@ export default function SetFramePrice() {
             <Table>
               <TableHead>
                 <TableRow>
+                  <StyledTableHeadCell>
+                    <Skeleton animation='wave' />
+                  </StyledTableHeadCell>
+                  <StyledTableHeadCell>
+                    <Skeleton animation='wave' />
+                  </StyledTableHeadCell>
+                  <StyledTableHeadCell>
+                    <Skeleton animation='wave' />
+                  </StyledTableHeadCell>
                   <StyledTableHeadCell>
                     <Skeleton animation='wave' />
                   </StyledTableHeadCell>
@@ -267,25 +1135,33 @@ export default function SetFramePrice() {
               onClick={() => handleAdd('size')}
               style={{ marginBottom: '20px' }}
             >
-              Add Size
+              เพิ่มขนาด
             </StyledButton>
             <TableContainer component={Paper} className='shadow-lg rounded-lg'>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <StyledTableHeadCell>No</StyledTableHeadCell>
-                    <StyledTableHeadCell>Size</StyledTableHeadCell>
-                    <StyledTableHeadCell align='right'>Action</StyledTableHeadCell>
+                    <StyledTableHeadCell>ลำดับ</StyledTableHeadCell>
+                    <StyledTableHeadCell>ขนาด</StyledTableHeadCell>
+                    <StyledTableHeadCell align='right'>การดำเนินการ</StyledTableHeadCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {sizes.map((size, index) => (
-                    <TableRow key={size.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{size.setsizename}</StyledTableCell>
-                      <StyledTableCell align='right'>{renderActionButtons(size.id)}</StyledTableCell>
+                  {sizes.length === 0 ? (
+                    <TableRow>
+                      <StyledTableCell colSpan={3} align='center'>
+                        ไม่มีข้อมูล
+                      </StyledTableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    sizes.map((size, index) => (
+                      <TableRow key={size.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                        <StyledTableCell>{index + 1}</StyledTableCell>
+                        <StyledTableCell>{size.setsizename}</StyledTableCell>
+                        <StyledTableCell align='right'>{renderActionButtons(size.id, 'size')}</StyledTableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -300,25 +1176,33 @@ export default function SetFramePrice() {
               onClick={() => handleAdd('color')}
               style={{ marginBottom: '20px' }}
             >
-              Add Color
+              เพิ่มสี
             </StyledButton>
             <TableContainer component={Paper} className='shadow-lg rounded-lg'>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <StyledTableHeadCell>No</StyledTableHeadCell>
-                    <StyledTableHeadCell>Color</StyledTableHeadCell>
-                    <StyledTableHeadCell align='right'>Action</StyledTableHeadCell>
+                    <StyledTableHeadCell>ลำดับ</StyledTableHeadCell>
+                    <StyledTableHeadCell>สี</StyledTableHeadCell>
+                    <StyledTableHeadCell align='right'>การดำเนินการ</StyledTableHeadCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {colors.map((color, index) => (
-                    <TableRow key={color.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{color.setcolorname}</StyledTableCell>
-                      <StyledTableCell align='right'>{renderActionButtons(color.id)}</StyledTableCell>
+                  {colors.length === 0 ? (
+                    <TableRow>
+                      <StyledTableCell colSpan={3} align='center'>
+                        ไม่มีข้อมูล
+                      </StyledTableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    colors.map((color, index) => (
+                      <TableRow key={color.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                        <StyledTableCell>{index + 1}</StyledTableCell>
+                        <StyledTableHeadCell>{color.setcolorname}</StyledTableHeadCell>
+                        <StyledTableCell align='right'>{renderActionButtons(color.id, 'color')}</StyledTableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -333,25 +1217,33 @@ export default function SetFramePrice() {
               onClick={() => handleAdd('category')}
               style={{ marginBottom: '20px' }}
             >
-              Add Category
+              เพิ่มกรอบ
             </StyledButton>
             <TableContainer component={Paper} className='shadow-lg rounded-lg'>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <StyledTableHeadCell>No</StyledTableHeadCell>
-                    <StyledTableHeadCell>Category</StyledTableHeadCell>
-                    <StyledTableHeadCell align='right'>Action</StyledTableHeadCell>
+                    <StyledTableHeadCell>ลำดับ</StyledTableHeadCell>
+                    <StyledTableHeadCell>หมวดหมู่</StyledTableHeadCell>
+                    <StyledTableHeadCell align='right'>การดำเนินการ</StyledTableHeadCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {frames.map((frame, index) => (
-                    <TableRow key={frame.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{frame.framesetname}</StyledTableCell>
-                      <StyledTableCell align='right'>{renderActionButtons(frame.id)}</StyledTableCell>
+                  {frames.length === 0 ? (
+                    <TableRow>
+                      <StyledTableCell colSpan={3} align='center'>
+                        ไม่มีข้อมูล
+                      </StyledTableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    frames.map((frame, index) => (
+                      <TableRow key={frame.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                        <StyledTableCell>{index + 1}</StyledTableCell>
+                        <StyledTableHeadCell>{frame.framesetname}</StyledTableHeadCell>
+                        <StyledTableCell align='right'>{renderActionButtons(frame.id, 'category')}</StyledTableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -366,32 +1258,55 @@ export default function SetFramePrice() {
               onClick={() => handleAdd('set')}
               style={{ marginBottom: '20px' }}
             >
-              Add Set
+              เพิ่มชุด
             </StyledButton>
             <TableContainer component={Paper} className='shadow-lg rounded-lg'>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <StyledTableHeadCell>No</StyledTableHeadCell>
-                    <StyledTableHeadCell>Size</StyledTableHeadCell>
-                    <StyledTableHeadCell>Color</StyledTableHeadCell>
-                    <StyledTableHeadCell>Category</StyledTableHeadCell>
-                    <StyledTableHeadCell align='right'>Action</StyledTableHeadCell>
+                    <StyledTableHeadCell>ลำดับ</StyledTableHeadCell>
+                    <StyledTableHeadCell>ชื่อกรอบ</StyledTableHeadCell>
+                    <StyledTableHeadCell>ขนาด</StyledTableHeadCell>
+                    <StyledTableHeadCell>สี</StyledTableHeadCell>
+                    <StyledTableHeadCell>ราคา</StyledTableHeadCell>
+                    <StyledTableHeadCell>การดำเนินการ</StyledTableHeadCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {sets.map((set, index) => (
-                    <TableRow key={set.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <StyledTableCell>{index + 1}</StyledTableCell>
-                      <StyledTableCell>{getNameById(sizes, set.frameSizeId, 'setsizename')}</StyledTableCell>
-                      <StyledTableCell>{getNameById(colors, set.frameColorId, 'setcolorname')}</StyledTableCell>
-                      <StyledTableCell>{getNameById(frames, set.frameCategoryId, 'framesetname')}</StyledTableCell>
-                      <StyledTableCell align='right'>{renderActionButtons(set.id)}</StyledTableCell>
+                  {sets.length === 0 ? (
+                    <TableRow>
+                      <StyledTableCell colSpan={6} align='center'>
+                        ไม่มีข้อมูล
+                      </StyledTableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    sets.map((set, index) => (
+                      <TableRow key={set.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                        <StyledTableCell>{(currentPage - 1) * limit + index + 1}</StyledTableCell>
+                        <StyledTableCell>{set.frameName}</StyledTableCell>
+                        <StyledTableCell>{set.sizeName}</StyledTableCell>
+                        <StyledTableCell>{set.colorName}</StyledTableCell>
+
+                        {/* แสดงราคาแทนภาพตัวอย่าง */}
+                        <StyledTableCell>{set.priceset_single} บาท</StyledTableCell>
+                        <StyledTableCell align='right'>{renderActionButtons(set.id, 'set')}</StyledTableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
+            {/* เพิ่ม Pagination */}
+            {totalPages > 1 && (
+              <Box display='flex' justifyContent='center' mt={2}>
+                <Pagination
+                  count={totalPages}
+                  page={currentPage}
+                  onChange={(event, value) => setCurrentPage(value)}
+                  color='primary'
+                />
+              </Box>
+            )}
           </>
         )
       default:
@@ -399,138 +1314,13 @@ export default function SetFramePrice() {
     }
   }
 
-  const AddSizeModal = () => (
-    <Dialog open={openModal.size} onClose={() => handleCloseModal('size')}>
-      <DialogTitle>Add New Size</DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin='dense'
-          label='Size Name'
-          fullWidth
-          value={formData.size}
-          onChange={e => handleInputChange('size', e.target.value)}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => handleCloseModal('size')}>Cancel</Button>
-        <Button onClick={submitAddSize} variant='contained' color='primary'>
-          Add
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-
-  const AddColorModal = () => (
-    <Dialog open={openModal.color} onClose={() => handleCloseModal('color')}>
-      <DialogTitle>Add New Color</DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin='dense'
-          label='Color Name'
-          fullWidth
-          value={formData.color}
-          onChange={e => handleInputChange('color', e.target.value)}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => handleCloseModal('color')}>Cancel</Button>
-        <Button onClick={submitAddColor} variant='contained' color='primary'>
-          Add
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-
-  const AddCategoryModal = () => (
-    <Dialog open={openModal.category} onClose={() => handleCloseModal('category')}>
-      <DialogTitle>Add New Category</DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin='dense'
-          label='Category Name'
-          fullWidth
-          value={formData.category}
-          onChange={e => handleInputChange('category', e.target.value)}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => handleCloseModal('category')}>Cancel</Button>
-        <Button onClick={submitAddCategory} variant='contained' color='primary'>
-          Add
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-
-  const AddSetModal = () => (
-    <Dialog open={openModal.set} onClose={() => handleCloseModal('set')}>
-      <DialogTitle>Add New Set</DialogTitle>
-      <DialogContent>
-        <FormControl fullWidth margin='dense'>
-          <InputLabel id='size-select-label'>Size</InputLabel>
-          <Select
-            labelId='size-select-label'
-            value={formData.set.sizeId}
-            label='Size'
-            onChange={e => handleInputChange('set', { sizeId: e.target.value })}
-          >
-            {sizes.map(size => (
-              <MenuItem key={size.id} value={size.id}>
-                {size.setsizename}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl fullWidth margin='dense'>
-          <InputLabel id='color-select-label'>Color</InputLabel>
-          <Select
-            labelId='color-select-label'
-            value={formData.set.colorId}
-            label='Color'
-            onChange={e => handleInputChange('set', { colorId: e.target.value })}
-          >
-            {colors.map(color => (
-              <MenuItem key={color.id} value={color.id}>
-                {color.setcolorname}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl fullWidth margin='dense'>
-          <InputLabel id='category-select-label'>Category</InputLabel>
-          <Select
-            labelId='category-select-label'
-            value={formData.set.categoryId}
-            label='Category'
-            onChange={e => handleInputChange('set', { categoryId: e.target.value })}
-          >
-            {frames.map(frame => (
-              <MenuItem key={frame.id} value={frame.id}>
-                {frame.framesetname}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => handleCloseModal('set')}>Cancel</Button>
-        <Button onClick={submitAddSet} variant='contained' color='primary'>
-          Add
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-
   return (
     <Box p={4}>
       <Typography variant='h3' component='h1' gutterBottom>
-        {isLoading ? <Skeleton width='50%' /> : 'กำหนดค่า'}
+        {isLoading ? <Skeleton width='50%' /> : 'การตั้งค่า'}
       </Typography>
       <Typography variant='h6' className='text-gray-600 mb-6'>
-        {isLoading ? <Skeleton width='70%' /> : 'เพิ่ม ลบ แก้ไข รายการ กรอบ สี ขนาด และ ราคาชุดภาพ'}
+        {isLoading ? <Skeleton width='70%' /> : 'เพิ่ม, ลบ, แก้ไข ขนาดกรอบ, สี, หมวดหมู่, และราคาเซ็ตกรอบ'}
       </Typography>
       <Box mb={4} display='flex' gap={2}>
         {isLoading ? (
@@ -538,7 +1328,7 @@ export default function SetFramePrice() {
             <Skeleton variant='rectangular' width={100} height={36} />
             <Skeleton variant='rectangular' width={100} height={36} />
             <Skeleton variant='rectangular' width={100} height={36} />
-            <Skeleton variant='rectangular' width={100} height={36} />
+            <Skeleton variant='rectangular' width={150} height={36} />
           </>
         ) : (
           <>
@@ -547,39 +1337,194 @@ export default function SetFramePrice() {
               color='primary'
               onClick={() => setActiveSection('size')}
             >
-              Sizes
+              จัดการขนาด
             </StyledButton>
             <StyledButton
               variant={activeSection === 'color' ? 'contained' : 'outlined'}
               color='primary'
               onClick={() => setActiveSection('color')}
             >
-              Colors
+              จัดการสี
             </StyledButton>
             <StyledButton
               variant={activeSection === 'category' ? 'contained' : 'outlined'}
               color='primary'
               onClick={() => setActiveSection('category')}
             >
-              Categories
+              จัดการกรอบ
             </StyledButton>
             <StyledButton
               variant={activeSection === 'sets' ? 'contained' : 'outlined'}
               color='primary'
               onClick={() => setActiveSection('sets')}
             >
-              Sets
+              จัดการราคารูปเดียว
             </StyledButton>
           </>
         )}
       </Box>
       {renderSection()}
 
-      {/* Modals */}
-      <AddSizeModal />
-      <AddColorModal />
-      <AddCategoryModal />
-      <AddSetModal />
+      {/* Modals with Error Props */}
+      <AddSizeModal
+        open={openSizeModal}
+        onClose={() => setOpenSizeModal(false)}
+        onAdd={submitAddSize}
+        sizeValue={formData.size}
+        onChange={value => handleInputChange('size', value)}
+        error={sizeError}
+      />
+      <AddColorModal
+        open={openColorModal}
+        onClose={() => setOpenColorModal(false)}
+        onAdd={submitAddColor}
+        colorValue={formData.color}
+        onChange={value => handleInputChange('color', value)}
+        error={colorError}
+      />
+      <AddCategoryModal
+        open={openCategoryModal}
+        onClose={() => setOpenCategoryModal(false)}
+        onAdd={submitAddCategory}
+        categoryValue={formData.category}
+        onChange={value => handleInputChange('category', value)}
+        error={categoryError}
+      />
+      <AddSetModal
+        open={openSetModal}
+        onClose={() => setOpenSetModal(false)}
+        onAdd={submitAddSet}
+        setData={formData.set}
+        onChange={value => handleInputChange('set', value)}
+        sizes={sizes}
+        colors={colors}
+        categories={frames}
+        error={setError}
+      />
+
+      {/* Edit Size Modal */}
+      {currentEditSize && (
+        <EditSizeModal
+          open={openEditSizeModal}
+          onClose={() => {
+            setOpenEditSizeModal(false)
+            setCurrentEditSize(null)
+            setEditSizeError('')
+          }}
+          onUpdate={submitUpdateSize}
+          sizeData={currentEditSize}
+          onChange={updatedFields => {
+            setCurrentEditSize(prev => ({
+              ...prev,
+              ...updatedFields
+            }))
+          }}
+          error={editSizeError}
+        />
+      )}
+
+      {/* Edit Color Modal */}
+      {currentEditColor && (
+        <EditColorModal
+          open={openEditColorModal}
+          onClose={() => {
+            setOpenEditColorModal(false)
+            setCurrentEditColor(null)
+            setEditColorError('')
+          }}
+          onUpdate={submitUpdateColor}
+          colorData={currentEditColor}
+          onChange={updatedFields => {
+            setCurrentEditColor(prev => ({
+              ...prev,
+              ...updatedFields
+            }))
+          }}
+          error={editColorError}
+        />
+      )}
+
+      {/* Edit Frame Category Modal */}
+      {currentEditFrameCategory && (
+        <EditFrameCategoryModal
+          open={openEditFrameCategoryModal}
+          onClose={() => {
+            setOpenEditFrameCategoryModal(false)
+            setCurrentEditFrameCategory(null)
+            setEditFrameCategoryError('')
+          }}
+          onUpdate={submitUpdateFrameCategory}
+          categoryData={currentEditFrameCategory}
+          onChange={updatedFields => {
+            setCurrentEditFrameCategory(prev => ({
+              ...prev,
+              ...updatedFields
+            }))
+          }}
+          error={editFrameCategoryError}
+        />
+      )}
+
+      {/* Edit Set Modal */}
+      {currentEditSet && (
+        <EditSetModal
+          open={openEditSetModal}
+          onClose={() => {
+            setOpenEditSetModal(false)
+            setCurrentEditSet(null)
+            setEditSetError({})
+          }}
+          onUpdate={submitUpdateSet}
+          setData={currentEditSet}
+          onChange={updatedFields => {
+            setCurrentEditSet(prev => ({
+              ...prev,
+              ...updatedFields
+            }))
+          }}
+          sizes={sizes}
+          colors={colors}
+          categories={frames}
+          error={editSetError}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        open={openDeleteModal}
+        onClose={() => {
+          setOpenDeleteModal(false)
+          setDeleteTargetId(null)
+          setDeleteTargetType(null)
+        }}
+        onConfirm={confirmDelete}
+        title='ยืนยันการลบ'
+        content={`คุณแน่ใจหรือไม่ว่าต้องการลบ ${
+          deleteTargetType === 'category'
+            ? 'กรอบ'
+            : deleteTargetType === 'size'
+              ? 'ขนาด'
+              : deleteTargetType === 'color'
+                ? 'สี'
+                : 'ชุด'
+        } นี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้.`}
+      />
+
+      {/* Snackbar for Notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }
