@@ -17,6 +17,11 @@ const dbConnect = async () => {
 export async function GET(req) {
   let connection
   try {
+    // สร้างออบเจ็กต์ URL จาก req.url
+    const url = new URL(req.url)
+    const searchParams = url.searchParams
+
+    // ดึงพารามิเตอร์ 'id' จาก searchParams
     const id = searchParams.get('id')
     if (!id || isNaN(parseInt(id))) {
       return NextResponse.json({ error: 'Invalid ID parameter' }, { status: 400 })

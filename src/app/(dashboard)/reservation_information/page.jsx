@@ -430,9 +430,46 @@ const ReservationInformation = () => {
     }
   }
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     console.log('Searching for:', searchFilm)
-    // คุณสามารถเพิ่มฟังก์ชันการค้นหาเพิ่มเติมได้ที่นี่
+    if (!searchFilm.trim()) {
+      showSnackbar('กรุณากรอกเลขฟิล์มที่ต้องการค้นหา', 'warning')
+      return
+    }
+
+    try {
+      const uni_id = addressData.uni_id
+      if (!uni_id) {
+        showSnackbar('ไม่พบ uni_id ที่จำเป็น', 'error')
+        return
+      }
+
+      // เรียกใช้ API สำหรับการค้นหา address
+      const response = await axios.get('/api/reservation/address/search', {
+        params: { film_no: searchFilm.trim(), uni_id }
+      })
+
+      const newId = response.data.id
+
+      if (newId) {
+        // นำทางไปยัง URL ใหม่ที่มี address.id ใหม่
+        router.push(`/reservation_information?id=${newId}`)
+      } else {
+        showSnackbar('ไม่พบข้อมูลที่ต้องการ', 'error')
+      }
+    } catch (error) {
+      if (error.response) {
+        if (error.response.status === 404) {
+          showSnackbar('ไม่พบเลขฟิล์มที่ตรงกับมหาวิทยาลัยนี้', 'error')
+        } else if (error.response.status === 400) {
+          showSnackbar('พารามิเตอร์ไม่ถูกต้อง', 'error')
+        } else {
+          showSnackbar('เกิดข้อผิดพลาดในการค้นหา', 'error')
+        }
+      } else {
+        showSnackbar('เกิดข้อผิดพลาดในการค้นหา', 'error')
+      }
+    }
   }
 
   // เพิ่ม useEffect เพื่อดึง bookingNumbers หลังจาก fetchData เรียบร้อย
@@ -683,18 +720,24 @@ const ReservationInformation = () => {
         </Grid>
         <Grid item xs={12}>
           <Typography className='mb-2'>ตำแหน่งรูปหมู่</Typography>
-          <Grid container spacing={1}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-              <Grid item xs={4} key={num}>
-                <TextField
-                  fullWidth
-                  label={`ตำแหน่ง ${num}`}
-                  value={addressData[`posiphoto_${num}`] || ''}
-                  onChange={e => handleAddressChange(`posiphoto_${num}`, e.target.value)}
-                />
+          {[1, 2, 3].map(row => (
+            <Grid container spacing={2} alignItems='center' key={row} sx={{ mb: 1 }}>
+              {/* แสดงข้อความรอบ */}
+              <Grid item xs={1.5}>
+                <Typography variant='subtitle2' color='textSecondary'>{`รอบที่${row}`}</Typography>
               </Grid>
-            ))}
-          </Grid>
+              {/* แสดง TextField 3 ช่องสำหรับแต่ละรอบ */}
+              {[1, 2, 3].map(col => (
+                <Grid item xs={3.5} key={`${row}-${col}`}>
+                  <TextField
+                    fullWidth
+                    value={addressData[`posiphoto_${(row - 1) * 3 + col}`] || ''}
+                    onChange={e => handleAddressChange(`posiphoto_${(row - 1) * 3 + col}`, e.target.value)}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          ))}
         </Grid>
         <Grid item xs={12}>
           <Button onClick={handleLogData} variant='contained' color='primary' fullWidth>

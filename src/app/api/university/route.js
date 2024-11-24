@@ -1,5 +1,7 @@
+// app/api/university/route.js
 import mysql from 'mysql2/promise'
 
+// ฟังก์ชันเชื่อมต่อฐานข้อมูล
 const dbConnect = async () => {
   return await mysql.createConnection({
     host: process.env.DB_HOST,
@@ -9,29 +11,145 @@ const dbConnect = async () => {
   })
 }
 
-// GET All universities
+// GET: ดึงข้อมูลทั้งหมดจากตาราง m_univercities
+// POST: เพิ่มมหาวิทยาลัยใหม่ลงในตาราง m_univercities
+// PUT: อัปเดตมหาวิทยาลัยที่ระบุ id ผ่าน Request Body
+// DELETE: ลบมหาวิทยาลัยที่ระบุ id ผ่าน Request Body
+
 export async function GET(request) {
   const connection = await dbConnect()
 
   try {
-    if (request.method === 'GET') {
-      // ดึงข้อมูลทั้งหมดจากตาราง m_univercities
-      const [universities] = await connection.execute('SELECT * FROM m_univercities')
+    // ดึงข้อมูลทั้งหมดจากตาราง m_univercities
+    const [universities] = await connection.execute('SELECT * FROM m_univercities')
 
-      return new Response(JSON.stringify({ universities }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    } else {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-        status: 405,
+    return new Response(JSON.stringify({ universities }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (error) {
+    console.error('Error handling GET request:', error)
+
+    return new Response(JSON.stringify({ error: 'เกิดข้อผิดพลาดในการประมวลผลคำขอ', details: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } finally {
+    await connection.end()
+  }
+}
+
+export async function POST(request) {
+  const connection = await dbConnect()
+
+  try {
+    const { unino, uniname, location, uni_year } = await request.json()
+
+    // ตรวจสอบว่ามีข้อมูลครบถ้วน
+    if (!unino || !uniname || !uni_year) {
+      return new Response(JSON.stringify({ error: 'กรุณากรอกข้อมูลที่จำเป็นทั้งหมด' }), {
+        status: 400,
         headers: { 'Content-Type': 'application/json' }
       })
     }
-  } catch (error) {
-    console.error('Error fetching universities:', error)
 
-    return new Response(JSON.stringify({ error: 'Universities could not be fetched', details: error.message }), {
+    // เพิ่มมหาวิทยาลัยใหม่ลงในฐานข้อมูล
+    const [result] = await connection.execute(
+      'INSERT INTO m_univercities (unino, uniname, location, uni_year) VALUES (?, ?, ?, ?)',
+      [unino, uniname, location || '', uni_year]
+    )
+
+    return new Response(JSON.stringify({ message: 'เพิ่มมหาวิทยาลัยสำเร็จ', id: result.insertId }), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (error) {
+    console.error('Error handling POST request:', error)
+
+    return new Response(JSON.stringify({ error: 'เกิดข้อผิดพลาดในการประมวลผลคำขอ', details: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } finally {
+    await connection.end()
+  }
+}
+
+export async function PUT(request) {
+  const connection = await dbConnect()
+
+  try {
+    const { id, unino, uniname, location, uni_year } = await request.json()
+
+    // ตรวจสอบว่ามี id และข้อมูลจำเป็นครบถ้วน
+    if (!id || !unino || !uniname || !uni_year) {
+      return new Response(JSON.stringify({ error: 'กรุณาระบุ id และกรอกข้อมูลที่จำเป็นทั้งหมด' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // อัปเดตมหาวิทยาลัยในฐานข้อมูล
+    const [result] = await connection.execute(
+      'UPDATE m_univercities SET unino = ?, uniname = ?, location = ?, uni_year = ?, updated_at = NOW() WHERE id = ?',
+      [unino, uniname, location || '', uni_year, id]
+    )
+
+    if (result.affectedRows === 0) {
+      return new Response(JSON.stringify({ error: 'ไม่พบมหาวิทยาลัยที่ระบุ' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    return new Response(JSON.stringify({ message: 'อัปเดตมหาวิทยาลัยสำเร็จ' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (error) {
+    console.error('Error handling PUT request:', error)
+
+    return new Response(JSON.stringify({ error: 'เกิดข้อผิดพลาดในการประมวลผลคำขอ', details: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } finally {
+    await connection.end()
+  }
+}
+
+export async function DELETE(request) {
+  const connection = await dbConnect()
+
+  try {
+    const { id } = await request.json()
+
+    // ตรวจสอบว่ามี id
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'กรุณาระบุ id ของมหาวิทยาลัยที่ต้องการลบ' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // ลบมหาวิทยาลัยจากฐานข้อมูล
+    const [result] = await connection.execute('DELETE FROM m_univercities WHERE id = ?', [id])
+
+    if (result.affectedRows === 0) {
+      return new Response(JSON.stringify({ error: 'ไม่พบมหาวิทยาลัยที่ระบุ' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    return new Response(JSON.stringify({ message: 'ลบมหาวิทยาลัยสำเร็จ' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (error) {
+    console.error('Error handling DELETE request:', error)
+
+    return new Response(JSON.stringify({ error: 'เกิดข้อผิดพลาดในการประมวลผลคำขอ', details: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     })
