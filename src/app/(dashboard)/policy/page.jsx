@@ -1,5 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import Visibility from '@mui/icons-material/Visibility'
+import VisibilityOff from '@mui/icons-material/VisibilityOff'
+import DeleteIcon from '@mui/icons-material/Delete' // เพิ่มการนำเข้า DeleteIcon
 
 import { getSession } from 'next-auth/react'
 import {
@@ -22,7 +25,9 @@ import {
   Paper,
   Skeleton,
   Typography,
-  Pagination
+  Pagination,
+  IconButton,
+  InputAdornment
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import CheckIcon from '@mui/icons-material/Check'
@@ -56,9 +61,13 @@ const UserManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', confirmPassword: '' })
+  const [newUser, setNewUser] = useState({ name: '', email: '', username: '', password: '', confirmPassword: '' })
   const [alertInfo, setAlertInfo] = useState({ open: false, message: '', severity: 'info' })
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false) // เพิ่มสถานะสำหรับ Dialog ยืนยันการลบ
+  const [userToDelete, setUserToDelete] = useState(null) // เพิ่มสถานะสำหรับผู้ใช้ที่จะลบ
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [allMenus, setAllMenus] = useState([])
   const itemsPerPage = 8
@@ -78,7 +87,6 @@ const UserManagementPage = () => {
         setStatus('unauthenticated')
       }
     } catch (error) {
-      console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', error)
       setAlertInfo({ open: true, message: 'เกิดข้อผิดพลาดในการดึงข้อมูล', severity: 'error' })
       setUsers([])
     } finally {
@@ -105,6 +113,18 @@ const UserManagementPage = () => {
     })
   }
 
+  const handleClickShowPassword = () => {
+    setShowPassword(prev => !prev)
+  }
+
+  const handleClickShowConfirmPassword = () => {
+    setShowConfirmPassword(prev => !prev)
+  }
+
+  const handleMouseDownPassword = event => {
+    event.preventDefault()
+  }
+
   const paginatedUsers = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   const handleEditPermissions = user => {
@@ -119,18 +139,19 @@ const UserManagementPage = () => {
 
   const handleSavePermissions = async () => {
     try {
-      if (!selectedUser || !selectedUser.user_id) {
+      if (!selectedUser || !selectedUser.id) {
+        // เปลี่ยนจาก user_id เป็น id
         console.error('selectedUser or userId is missing')
         return
       }
 
-      const response = await axios.put(`/api/permission/${selectedUser.user_id}`, {
+      const response = await axios.put(`/api/permission/${selectedUser.id}`, {
         permissions: selectedUser.permissions
       })
 
       setUsers(prevUsers =>
         prevUsers.map(user =>
-          user.user_id === selectedUser.user_id ? { ...user, permissions: response.data.permissions } : user
+          user.id === selectedUser.id ? { ...user, permissions: response.data.permissions } : user
         )
       )
       setAlertInfo({ open: true, message: 'บันทึกสิทธิ์เรียบร้อยแล้ว', severity: 'success' })
@@ -142,32 +163,46 @@ const UserManagementPage = () => {
   }
 
   const handleAddUser = async () => {
-    if (!newUser.name || !newUser.email || !newUser.password || !newUser.confirmPassword) {
+    const { name, email, username, password, confirmPassword } = newUser
+
+    // การตรวจสอบข้อมูลพื้นฐาน
+    if (!name || !email || !username || !password || !confirmPassword) {
       setAlertInfo({ open: true, message: 'กรุณากรอกข้อมูลให้ครบทุกช่อง', severity: 'error' })
       return
     }
 
-    if (newUser.password !== newUser.confirmPassword) {
+    if (password !== confirmPassword) {
       setAlertInfo({ open: true, message: 'รหัสผ่านไม่ตรงกัน', severity: 'error' })
       return
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(newUser.email)) {
+    if (!emailRegex.test(email)) {
       setAlertInfo({ open: true, message: 'กรุณากรอกอีเมลให้ถูกต้อง', severity: 'error' })
       return
     }
 
+    const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/
+    if (!usernameRegex.test(username)) {
+      setAlertInfo({
+        open: true,
+        message: 'ชื่อผู้ใช้ไม่ถูกต้อง กรุณาใช้ 3-30 อักขระ: ตัวอักษร, ตัวเลข, หรือ _',
+        severity: 'error'
+      })
+      return
+    }
+
     try {
-      const response = await axios.post('/api/users', newUser)
-      setUsers(prevUsers => [...prevUsers, response.data])
+      const response = await axios.post('/api/users', { name, email, username, password, confirmPassword })
+      const userWithPermissions = { ...response.data, permissions: response.data.permissions || [] }
+      setUsers(prevUsers => [...prevUsers, userWithPermissions])
       setIsModalOpen(false)
-      setNewUser({ name: '', email: '', password: '', confirmPassword: '' })
+      setNewUser({ name: '', email: '', username: '', password: '', confirmPassword: '' }) // รวม username
       setAlertInfo({ open: true, message: 'เพิ่มผู้ใช้สำเร็จ', severity: 'success' })
     } catch (error) {
       console.error('เกิดข้อผิดพลาดในการเพิ่มผู้ใช้:', error.response ? error.response.data : error.message)
-      if (error.response && error.response.data.code === 'EMAIL_EXISTS') {
-        setAlertInfo({ open: true, message: 'อีเมลนี้มีอยู่ในระบบแล้ว กรุณาใช้อีเมลอื่น', severity: 'warning' })
+      if (error.response && error.response.data.message) {
+        setAlertInfo({ open: true, message: error.response.data.message, severity: 'error' })
       } else {
         setAlertInfo({ open: true, message: 'เกิดข้อผิดพลาดในการเพิ่มผู้ใช้ กรุณาลองใหม่อีกครั้ง', severity: 'error' })
       }
@@ -184,6 +219,43 @@ const UserManagementPage = () => {
   const handleInputChange = e => {
     const { name, value } = e.target
     setNewUser(prevUser => ({ ...prevUser, [name]: value }))
+  }
+
+  // ฟังก์ชันสำหรับเปิด Dialog ยืนยันการลบ
+  const handleDeleteUser = user => {
+    setUserToDelete(user)
+    setIsDeleteDialogOpen(true)
+  }
+
+  // ฟังก์ชันสำหรับปิด Dialog ยืนยันการลบ
+  const handleCloseDeleteDialog = () => {
+    setUserToDelete(null)
+    setIsDeleteDialogOpen(false)
+  }
+
+  // ฟังก์ชันสำหรับลบผู้ใช้จริง
+  const handleConfirmDeleteUser = async () => {
+    try {
+      if (!userToDelete || !userToDelete.user_id) {
+        // เปลี่ยนจาก id เป็น user_id
+
+        setAlertInfo({ open: true, message: 'ไม่พบ ID ของผู้ใช้', severity: 'error' })
+        return
+      }
+
+      const response = await axios.delete('/api/users', {
+        data: { id: userToDelete.user_id } // ส่ง id ใน body ของคำขอ DELETE
+      })
+
+      if (response.status === 200) {
+        setUsers(prevUsers => prevUsers.filter(u => u.user_id !== userToDelete.user_id)) // ใช้ user_id
+        setAlertInfo({ open: true, message: 'ลบผู้ใช้สำเร็จ', severity: 'success' })
+      }
+    } catch (error) {
+      setAlertInfo({ open: true, message: 'เกิดข้อผิดพลาดในการลบผู้ใช้', severity: 'error' })
+    } finally {
+      handleCloseDeleteDialog()
+    }
   }
 
   const renderSkeletonTable = () => (
@@ -296,15 +368,24 @@ const UserManagementPage = () => {
           </TableHead>
           <TableBody>
             {paginatedUsers.map((user, index) => (
-              <TableRow key={user.user_id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+              <TableRow key={user.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                 <StyledTableCell>{user.name}</StyledTableCell>
                 <StyledTableCell>{user.email}</StyledTableCell>
                 <StyledTableCell>{user.role}</StyledTableCell>
-                <StyledTableCell>{user.permissions.length}</StyledTableCell>
+                <StyledTableCell>{user.permissions?.length || 0}</StyledTableCell>
                 <StyledTableCell>
-                  <StyledButton variant='contained' color='primary' onClick={() => handleEditPermissions(user)}>
-                    <SettingsIcon />
-                  </StyledButton>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <StyledButton variant='contained' color='primary' onClick={() => handleEditPermissions(user)}>
+                      <SettingsIcon />
+                    </StyledButton>
+                    <StyledButton
+                      variant='contained'
+                      color='error'
+                      onClick={() => handleDeleteUser(user)} // ใช้ handleDeleteUser
+                    >
+                      <DeleteIcon />
+                    </StyledButton>
+                  </Box>
                 </StyledTableCell>
               </TableRow>
             ))}
@@ -316,6 +397,7 @@ const UserManagementPage = () => {
         <Pagination count={totalPages} page={currentPage} onChange={handlePageChange} color='primary' size='large' />
       </Box>
 
+      {/* Dialog สำหรับแก้ไขสิทธิ์ */}
       <Dialog open={isPermissionModalOpen} onClose={handleClosePermissionModal}>
         <DialogTitle>แก้ไขสิทธิ์สำหรับ {selectedUser?.name}</DialogTitle>
         <DialogContent>
@@ -351,6 +433,7 @@ const UserManagementPage = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Dialog สำหรับเพิ่มผู้ใช้ใหม่ */}
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <DialogTitle>เพิ่มผู้ใช้ใหม่</DialogTitle>
         <DialogContent>
@@ -367,6 +450,16 @@ const UserManagementPage = () => {
           />
           <TextField
             margin='dense'
+            name='username'
+            label='Username (สำหรับเข้าสู่ระบบ)'
+            type='text'
+            fullWidth
+            variant='outlined'
+            value={newUser.username}
+            onChange={handleInputChange}
+          />
+          <TextField
+            margin='dense'
             name='email'
             label='อีเมล'
             type='email'
@@ -379,21 +472,49 @@ const UserManagementPage = () => {
             margin='dense'
             name='password'
             label='รหัสผ่าน'
-            type='password'
+            type={showPassword ? 'text' : 'password'}
             fullWidth
             variant='outlined'
             value={newUser.password}
             onChange={handleInputChange}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position='end'>
+                  <IconButton
+                    aria-label='toggle password visibility'
+                    onClick={handleClickShowPassword}
+                    onMouseDown={handleMouseDownPassword}
+                    edge='end'
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
           />
           <TextField
             margin='dense'
             name='confirmPassword'
             label='ยืนยันรหัสผ่าน'
-            type='password'
+            type={showConfirmPassword ? 'text' : 'password'}
             fullWidth
             variant='outlined'
             value={newUser.confirmPassword}
             onChange={handleInputChange}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position='end'>
+                  <IconButton
+                    aria-label='toggle confirm password visibility'
+                    onClick={handleClickShowConfirmPassword}
+                    onMouseDown={handleMouseDownPassword}
+                    edge='end'
+                  >
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
           />
         </DialogContent>
         <DialogActions>
@@ -401,6 +522,20 @@ const UserManagementPage = () => {
           <StyledButton onClick={handleAddUser} variant='contained'>
             เพิ่มผู้ใช้
           </StyledButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog สำหรับยืนยันการลบผู้ใช้ */}
+      <Dialog open={isDeleteDialogOpen} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>ยืนยันการลบผู้ใช้</DialogTitle>
+        <DialogContent>
+          <Typography>คุณแน่ใจหรือไม่ที่จะลบผู้ใช้ "{userToDelete?.name}"?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog}>ยกเลิก</Button>
+          <Button onClick={handleConfirmDeleteUser} variant='contained' color='error'>
+            ลบผู้ใช้
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
