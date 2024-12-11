@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { Client } from 'basic-ftp'
 import { Readable } from 'stream'
 import mysql from 'mysql2/promise'
+import SFTPClient from 'ssh2-sftp-client'
 
 export async function POST(request) {
   try {
@@ -29,25 +29,21 @@ export async function POST(request) {
     const buffer = await file.arrayBuffer()
     const bufferData = Buffer.from(buffer)
 
-    // แปลง Buffer เป็น Readable Stream
-    const stream = new Readable()
-    stream.push(bufferData)
-    stream.push(null)
+    // อัปโหลดไฟล์ไปยัง SFTP
+    const sftp = new SFTPClient()
+    try {
+      await sftp.connect({
+        host: '203.146.170.155',
+        port: 22,
+        username: 'zpansawut',
+        password: 'Drhq7ZV5QKXDn6brru6A'
+      })
 
-    // อัปโหลดไฟล์ไปยัง FTP
-    const client = new Client()
-    client.ftp.verbose = true
-    await client.access({
-      host: '203.146.170.155',
-      user: 'zpansawut',
-      password: 'Drhq7ZV5QKXDn6brru6A',
-      port: 21,
-      secure: false
-    })
-
-    const remotePath = `/domains/pansawut.orangeworkshop.info/public_html/papayond/public/dist/img/${file.name}`
-    await client.uploadFrom(stream, remotePath)
-    await client.close()
+      const remotePath = `/domains/pansawut.orangeworkshop.info/public_html/papayond/public/dist/img/${file.name}`
+      await sftp.put(bufferData, remotePath)
+    } finally {
+      await sftp.end()
+    }
 
     // เชื่อมต่อฐานข้อมูล
     const db = await mysql.createConnection({
