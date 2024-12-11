@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import Visibility from '@mui/icons-material/Visibility'
 import VisibilityOff from '@mui/icons-material/VisibilityOff'
 import DeleteIcon from '@mui/icons-material/Delete' // เพิ่มการนำเข้า DeleteIcon
+import MoreVertIcon from '@mui/icons-material/MoreVert' // นำเข้าไอคอนสำหรับเมนูเพิ่มเติม
 
 import { getSession } from 'next-auth/react'
 import {
@@ -27,7 +28,9 @@ import {
   Typography,
   Pagination,
   IconButton,
-  InputAdornment
+  InputAdornment,
+  Menu,
+  MenuItem
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import CheckIcon from '@mui/icons-material/Check'
@@ -68,6 +71,24 @@ const UserManagementPage = () => {
   const [userToDelete, setUserToDelete] = useState(null) // เพิ่มสถานะสำหรับผู้ใช้ที่จะลบ
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // สถานะและฟังก์ชันสำหรับเมนูเพิ่มเติม
+  const [anchorEl, setAnchorEl] = useState(null)
+  const [menuUserId, setMenuUserId] = useState(null)
+  const openMenu = Boolean(anchorEl)
+
+  // สถานะและฟังก์ชันสำหรับ Dialog แก้ไขรหัสผ่าน
+  const [isEditPasswordDialogOpen, setIsEditPasswordDialogOpen] = useState(false)
+  const [passwordUser, setPasswordUser] = useState(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false)
+
+  // สถานะและฟังก์ชันสำหรับ Dialog แก้ไขชื่อผู้ใช้
+  const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false)
+  const [nameUser, setNameUser] = useState(null)
+  const [newName, setNewName] = useState('')
 
   const [allMenus, setAllMenus] = useState([])
   const itemsPerPage = 8
@@ -140,7 +161,6 @@ const UserManagementPage = () => {
   const handleSavePermissions = async () => {
     try {
       if (!selectedUser || !selectedUser.id) {
-        // เปลี่ยนจาก user_id เป็น id
         console.error('selectedUser or userId is missing')
         return
       }
@@ -193,11 +213,11 @@ const UserManagementPage = () => {
     }
 
     try {
-      const response = await axios.post('/api/users', { name, email, username, password, confirmPassword })
+      const response = await axios.post('/api/user', { name, email, username, password, confirmPassword })
       const userWithPermissions = { ...response.data, permissions: response.data.permissions || [] }
       setUsers(prevUsers => [...prevUsers, userWithPermissions])
       setIsModalOpen(false)
-      setNewUser({ name: '', email: '', username: '', password: '', confirmPassword: '' }) // รวม username
+      setNewUser({ name: '', email: '', username: '', password: '', confirmPassword: '' })
       setAlertInfo({ open: true, message: 'เพิ่มผู้ใช้สำเร็จ', severity: 'success' })
     } catch (error) {
       console.error('เกิดข้อผิดพลาดในการเพิ่มผู้ใช้:', error.response ? error.response.data : error.message)
@@ -236,25 +256,131 @@ const UserManagementPage = () => {
   // ฟังก์ชันสำหรับลบผู้ใช้จริง
   const handleConfirmDeleteUser = async () => {
     try {
-      if (!userToDelete || !userToDelete.user_id) {
-        // เปลี่ยนจาก id เป็น user_id
-
+      if (!userToDelete || !userToDelete.id) {
+        // ตรวจสอบว่าใช้ `id` ไม่ใช่ `user_id`
         setAlertInfo({ open: true, message: 'ไม่พบ ID ของผู้ใช้', severity: 'error' })
         return
       }
 
-      const response = await axios.delete('/api/users', {
-        data: { id: userToDelete.user_id } // ส่ง id ใน body ของคำขอ DELETE
+      const response = await axios.delete('/api/user', {
+        data: { id: userToDelete.id } // ส่ง id ใน body ของคำขอ DELETE
       })
 
       if (response.status === 200) {
-        setUsers(prevUsers => prevUsers.filter(u => u.user_id !== userToDelete.user_id)) // ใช้ user_id
+        setUsers(prevUsers => prevUsers.filter(u => u.id !== userToDelete.id)) // ใช้ id
         setAlertInfo({ open: true, message: 'ลบผู้ใช้สำเร็จ', severity: 'success' })
       }
     } catch (error) {
       setAlertInfo({ open: true, message: 'เกิดข้อผิดพลาดในการลบผู้ใช้', severity: 'error' })
     } finally {
       handleCloseDeleteDialog()
+    }
+  }
+
+  // ฟังก์ชันสำหรับเปิดเมนูเพิ่มเติม
+  const handleMenuOpen = (event, userId) => {
+    setAnchorEl(event.currentTarget)
+    setMenuUserId(userId)
+  }
+
+  // ฟังก์ชันสำหรับปิดเมนูเพิ่มเติม
+  const handleMenuClose = () => {
+    setAnchorEl(null)
+    setMenuUserId(null)
+  }
+
+  // ฟังก์ชันสำหรับเปิด Dialog แก้ไขรหัสผ่าน
+  const handleEditPassword = user => {
+    setPasswordUser(user)
+    setIsEditPasswordDialogOpen(true)
+    handleMenuClose()
+  }
+
+  // ฟังก์ชันสำหรับปิด Dialog แก้ไขรหัสผ่าน
+  const handleCloseEditPasswordDialog = () => {
+    setIsEditPasswordDialogOpen(false)
+    setPasswordUser(null)
+    setNewPassword('')
+    setConfirmNewPassword('')
+    setShowNewPassword(false)
+    setShowConfirmNewPassword(false)
+  }
+
+  // ฟังก์ชันสำหรับบันทึกรหัสผ่านใหม่
+  const handleSaveNewPassword = async () => {
+    if (!passwordUser || !newPassword || !confirmNewPassword) {
+      setAlertInfo({ open: true, message: 'กรุณากรอกข้อมูลให้ครบถ้วน', severity: 'error' })
+      return
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setAlertInfo({ open: true, message: 'รหัสผ่านไม่ตรงกัน', severity: 'error' })
+      return
+    }
+
+    try {
+      const response = await axios.patch('/api/user', { id: passwordUser.id, newPassword })
+
+      if (response.status === 200) {
+        setAlertInfo({ open: true, message: 'เปลี่ยนรหัสผ่านสำเร็จ', severity: 'success' })
+        handleCloseEditPasswordDialog()
+      }
+    } catch (error) {
+      console.error('เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน:', error.response ? error.response.data : error.message)
+      if (error.response && error.response.data.message) {
+        setAlertInfo({ open: true, message: error.response.data.message, severity: 'error' })
+      } else {
+        setAlertInfo({
+          open: true,
+          message: 'เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน กรุณาลองใหม่อีกครั้ง',
+          severity: 'error'
+        })
+      }
+    }
+  }
+
+  // ฟังก์ชันสำหรับเปิด Dialog แก้ไขชื่อผู้ใช้
+  const handleEditName = user => {
+    setNameUser(user)
+    setIsEditNameDialogOpen(true)
+    handleMenuClose()
+  }
+
+  // ฟังก์ชันสำหรับปิด Dialog แก้ไขชื่อผู้ใช้
+  const handleCloseEditNameDialog = () => {
+    setIsEditNameDialogOpen(false)
+    setNameUser(null)
+    setNewName('')
+  }
+
+  // ฟังก์ชันสำหรับบันทึกชื่อใหม่
+  const handleSaveNewName = async () => {
+    if (!nameUser || !newName.trim()) {
+      setAlertInfo({ open: true, message: 'กรุณากรอกชื่อใหม่', severity: 'error' })
+      return
+    }
+
+    try {
+      const response = await axios.patch('/api/user', { id: nameUser.id, newName: newName.trim() })
+
+      if (response.status === 200) {
+        setUsers(prevUsers =>
+          prevUsers.map(user => (user.id === nameUser.id ? { ...user, name: newName.trim() } : user))
+        )
+        setAlertInfo({ open: true, message: 'แก้ไขชื่อผู้ใช้สำเร็จ', severity: 'success' })
+        handleCloseEditNameDialog()
+      }
+    } catch (error) {
+      console.error('เกิดข้อผิดพลาดในการแก้ไขชื่อผู้ใช้:', error.response ? error.response.data : error.message)
+      if (error.response && error.response.data.message) {
+        setAlertInfo({ open: true, message: error.response.data.message, severity: 'error' })
+      } else {
+        setAlertInfo({
+          open: true,
+          message: 'เกิดข้อผิดพลาดในการแก้ไขชื่อผู้ใช้ กรุณาลองใหม่อีกครั้ง',
+          severity: 'error'
+        })
+      }
     }
   }
 
@@ -374,18 +500,63 @@ const UserManagementPage = () => {
                 <StyledTableCell>{user.role}</StyledTableCell>
                 <StyledTableCell>{user.permissions?.length || 0}</StyledTableCell>
                 <StyledTableCell>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <StyledButton variant='contained' color='primary' onClick={() => handleEditPermissions(user)}>
-                      <SettingsIcon />
-                    </StyledButton>
-                    <StyledButton
-                      variant='contained'
-                      color='error'
-                      onClick={() => handleDeleteUser(user)} // ใช้ handleDeleteUser
+                  <IconButton
+                    aria-label='more'
+                    aria-controls={openMenu && menuUserId === user.id ? 'long-menu' : undefined}
+                    aria-haspopup='true'
+                    onClick={event => handleMenuOpen(event, user.id)}
+                  >
+                    <MoreVertIcon />
+                  </IconButton>
+                  <Menu
+                    id='long-menu'
+                    anchorEl={anchorEl}
+                    open={openMenu && menuUserId === user.id}
+                    onClose={handleMenuClose}
+                    PaperProps={{
+                      style: {
+                        maxHeight: 48 * 4.5,
+                        width: '20ch'
+                      }
+                    }}
+                  >
+                    <MenuItem
+                      onClick={() => {
+                        handleEditPermissions(user)
+                      }}
                     >
-                      <DeleteIcon />
-                    </StyledButton>
-                  </Box>
+                      <SettingsIcon fontSize='small' style={{ marginRight: 8 }} />
+                      แก้ไขสิทธิ์
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        handleEditPassword(user)
+                      }}
+                    >
+                      <VisibilityOff fontSize='small' style={{ marginRight: 8 }} />
+                      แก้ไขรหัสผ่าน
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        handleEditName(user)
+                      }}
+                    >
+                      <Typography variant='inherit' style={{ marginRight: 8 }}>
+                        ✏️
+                      </Typography>{' '}
+                      {/* ใช้ Emoji หรือไอคอนอื่นแทน */}
+                      แก้ไขชื่อ
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        handleDeleteUser(user)
+                      }}
+                    >
+                      <DeleteIcon fontSize='small' color='error' style={{ marginRight: 8 }} />{' '}
+                      {/* เปลี่ยนสีของไอคอนเป็นสีแดง */}
+                      ลบผู้ใช้
+                    </MenuItem>
+                  </Menu>
                 </StyledTableCell>
               </TableRow>
             ))}
@@ -535,6 +706,91 @@ const UserManagementPage = () => {
           <Button onClick={handleCloseDeleteDialog}>ยกเลิก</Button>
           <Button onClick={handleConfirmDeleteUser} variant='contained' color='error'>
             ลบผู้ใช้
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog สำหรับแก้ไขรหัสผ่าน */}
+      <Dialog open={isEditPasswordDialogOpen} onClose={handleCloseEditPasswordDialog}>
+        <DialogTitle>แก้ไขรหัสผ่านสำหรับ {passwordUser?.name}</DialogTitle>
+        <DialogContent>
+          <TextField
+            margin='dense'
+            name='newPassword'
+            label='รหัสผ่านใหม่'
+            type={showNewPassword ? 'text' : 'password'}
+            fullWidth
+            variant='outlined'
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position='end'>
+                  <IconButton
+                    aria-label='toggle new password visibility'
+                    onClick={() => setShowNewPassword(prev => !prev)}
+                    onMouseDown={handleMouseDownPassword}
+                    edge='end'
+                  >
+                    {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+          <TextField
+            margin='dense'
+            name='confirmNewPassword'
+            label='ยืนยันรหัสผ่านใหม่'
+            type={showConfirmNewPassword ? 'text' : 'password'}
+            fullWidth
+            variant='outlined'
+            value={confirmNewPassword}
+            onChange={e => setConfirmNewPassword(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position='end'>
+                  <IconButton
+                    aria-label='toggle confirm new password visibility'
+                    onClick={() => setShowConfirmNewPassword(prev => !prev)}
+                    onMouseDown={handleMouseDownPassword}
+                    edge='end'
+                  >
+                    {showConfirmNewPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditPasswordDialog}>ยกเลิก</Button>
+          <Button onClick={handleSaveNewPassword} variant='contained'>
+            บันทึกรหัสผ่าน
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog สำหรับแก้ไขชื่อผู้ใช้ */}
+      <Dialog open={isEditNameDialogOpen} onClose={handleCloseEditNameDialog}>
+        <DialogTitle>แก้ไขชื่อผู้ใช้สำหรับ {nameUser?.name}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin='dense'
+            name='newName'
+            label='ชื่อใหม่'
+            type='text'
+            fullWidth
+            variant='outlined'
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditNameDialog}>ยกเลิก</Button>
+          <Button onClick={handleSaveNewName} variant='contained'>
+            บันทึกชื่อใหม่
           </Button>
         </DialogActions>
       </Dialog>

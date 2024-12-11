@@ -1,4 +1,4 @@
-// app/api/users/route.js
+// app/api/user/route.js
 import mysql from 'mysql2/promise'
 import bcrypt from 'bcrypt' // นำเข้า bcrypt
 
@@ -69,14 +69,14 @@ export async function POST(request) {
       })
     }
 
-    // แฮชพาสเวิร์ด
-    const hashedPassword = await bcrypt.hash(password, 10)
+    // ไม่แฮชพาสเวิร์ด (เก็บเป็นข้อความธรรมดา)
+    const plainPassword = password
 
     // ใส่ข้อมูลผู้ใช้ใหม่ลงในฐานข้อมูล
     const [result] = await connection.execute(
       `INSERT INTO users (name, email, role, username, password, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      [name, email, 'user', username, hashedPassword] // ปรับค่า role ตามต้องการ
+      [name, email, 'user', username, plainPassword] // ใช้ plainPassword แทน hashedPassword
     )
 
     // ดึงข้อมูลผู้ใช้ที่เพิ่งถูกสร้างขึ้น (ยกเว้นรหัสผ่าน)
@@ -113,7 +113,6 @@ export async function POST(request) {
 }
 
 // ฟังก์ชัน DELETE สำหรับลบผู้ใช้
-
 export async function DELETE(request) {
   let connection
 
@@ -152,6 +151,98 @@ export async function DELETE(request) {
     })
   } catch (error) {
     console.error('Error deleting user:', error)
+    if (process.env.NODE_ENV === 'development') {
+      return new Response(JSON.stringify({ message: 'Internal server error', error: error.message }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+    return new Response(JSON.stringify({ message: 'Internal server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } finally {
+    if (connection) {
+      await connection.end()
+    }
+  }
+}
+
+// ฟังก์ชัน PATCH สำหรับแก้ไขรหัสผ่านหรือชื่อผู้ใช้
+export async function PATCH(request) {
+  let connection
+
+  try {
+    const body = await request.json()
+    const { id, newPassword, newName } = body
+
+    // ตรวจสอบว่า id ถูกส่งมาไหม
+    if (!id) {
+      return new Response(JSON.stringify({ message: 'User ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // ตรวจสอบว่ามีข้อมูลที่จะอัพเดทไหม
+    if (!newPassword && !newName) {
+      return new Response(JSON.stringify({ message: 'No data to update' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // เชื่อมต่อกับฐานข้อมูล
+    connection = await dbConnect()
+
+    // ตรวจสอบว่าผู้ใช้มีอยู่จริงหรือไม่
+    const [rows] = await connection.execute('SELECT id FROM users WHERE id = ?', [id])
+
+    if (rows.length === 0) {
+      return new Response(JSON.stringify({ message: 'ค้นหาผู้ใช้ไม่พบ' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // สร้างอาร์เรย์สำหรับเก็บคิวรี
+    const updates = []
+    const params = []
+
+    if (newName) {
+      updates.push('name = ?')
+      params.push(newName)
+    }
+
+    if (newPassword) {
+      updates.push('password = ?')
+      params.push(newPassword)
+    }
+
+    updates.push('updated_at = NOW()')
+
+    const updateQuery = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`
+    params.push(id)
+
+    // อัพเดทข้อมูลผู้ใช้
+    await connection.execute(updateQuery, params)
+
+    // สร้างข้อความตอบกลับ
+    let message = 'User updated successfully'
+    if (newName && newPassword) {
+      message = 'Name and password updated successfully'
+    } else if (newName) {
+      message = 'Name updated successfully'
+    } else if (newPassword) {
+      message = 'Password updated successfully'
+    }
+
+    return new Response(JSON.stringify({ message }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (error) {
+    console.error('Error updating user:', error)
     if (process.env.NODE_ENV === 'development') {
       return new Response(JSON.stringify({ message: 'Internal server error', error: error.message }), {
         status: 500,
