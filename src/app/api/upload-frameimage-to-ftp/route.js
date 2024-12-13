@@ -33,13 +33,14 @@ export async function POST(request) {
     const sftp = new SFTPClient()
     try {
       await sftp.connect({
-        host: '203.146.170.155',
+        
+        host: '203.146.127.196',
         port: 22,
-        username: 'zpansawut',
-        password: 'Drhq7ZV5QKXDn6brru6A'
+        username: 'root',
+        password: 'uF4d$FM-##Qr196'
       })
 
-      const remotePath = `/domains/pansawut.orangeworkshop.info/public_html/papayond/public/dist/img/${file.name}`
+      const remotePath = `${file.name}`
       await sftp.put(bufferData, remotePath)
     } finally {
       await sftp.end()

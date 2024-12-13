@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import mysql from 'mysql2/promise'
-
+import { hashPassword,verifyPassword } from '../../../../utils/hash';
 // สร้างฟังก์ชันสำหรับเชื่อมต่อกับ MySQL
 const dbConnect = async () => {
   return await mysql.createConnection({
@@ -27,9 +27,15 @@ export const authOptions = {
         try {
           const [rows] = await conn.execute('SELECT * FROM users WHERE username = ?', [credentials.username])
           const user = rows[0]
-          console.log('User found:', user)
-
-          if (user && credentials.password === user.password) {
+          // console.log('User found:', user)
+          // const hashedPassword = await hashPassword(credentials.password);
+          // // const hashedPassword = await hashPassword(user.password);
+          const isValid = await verifyPassword(credentials.password,user.password);
+          if (!isValid) {
+            throw new Error('Invalid username or password')
+            
+          }else{
+          // if (user && credentials.password === user.password) {
             // ไม่แนะนำให้เก็บรหัสผ่านแบบ plaintext ในการใช้งานจริง
             return {
               id: user.id,
@@ -38,9 +44,10 @@ export const authOptions = {
               role: user.role,
               username: user.username
             }
-          } else {
-            throw new Error('Invalid username or password')
-          }
+          } 
+          // else {
+          //   throw new Error('Invalid username or password')
+          // }
         } finally {
           await conn.end()
         }

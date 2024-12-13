@@ -97,6 +97,7 @@ const LoginV2 = ({ mode }) => {
   const handleSubmit = async e => {
     e.preventDefault()
 
+    
     const result = await signIn('credentials', {
       redirect: false,
       username,

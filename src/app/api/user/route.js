@@ -1,6 +1,6 @@
 // app/api/user/route.js
 import mysql from 'mysql2/promise'
-import bcrypt from 'bcrypt' // นำเข้า bcrypt
+import { hashPassword } from '../../../utils/hash';
 
 // ฟังก์ชันเชื่อมต่อกับฐานข้อมูล
 const dbConnect = async () => {
@@ -69,15 +69,19 @@ export async function POST(request) {
       })
     }
 
-    // ไม่แฮชพาสเวิร์ด (เก็บเป็นข้อความธรรมดา)
-    const plainPassword = password
 
+      
+  
+  // Hashing successful, 'hash' contains the h
     // ใส่ข้อมูลผู้ใช้ใหม่ลงในฐานข้อมูล
+    const hashedPassword = await hashPassword(password);
+    // const passwordsMatch = password;
     const [result] = await connection.execute(
       `INSERT INTO users (name, email, role, username, password, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      [name, email, 'user', username, plainPassword] // ใช้ plainPassword แทน hashedPassword
+      [name, email, 'user', username, hashedPassword] // ใช้ plainPassword แทน hashedPassword
     )
+   
 
     // ดึงข้อมูลผู้ใช้ที่เพิ่งถูกสร้างขึ้น (ยกเว้นรหัสผ่าน)
     const newUserId = result.insertId
@@ -215,8 +219,9 @@ export async function PATCH(request) {
     }
 
     if (newPassword) {
+      const hashedPassword = await hashPassword(newPassword);
       updates.push('password = ?')
-      params.push(newPassword)
+      params.push(hashedPassword)
     }
 
     updates.push('updated_at = NOW()')

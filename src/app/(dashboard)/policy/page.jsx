@@ -159,19 +159,22 @@ const UserManagementPage = () => {
   }
 
   const handleSavePermissions = async () => {
+    // console.log(users,selectedUser)
+
     try {
-      if (!selectedUser || !selectedUser.id) {
+
+      if (!selectedUser || !selectedUser.user_id) {
         console.error('selectedUser or userId is missing')
         return
       }
 
-      const response = await axios.put(`/api/permission/${selectedUser.id}`, {
+      const response = await axios.put(`/api/permission/${selectedUser.user_id}`, {
         permissions: selectedUser.permissions
       })
 
       setUsers(prevUsers =>
-        prevUsers.map(user =>
-          user.id === selectedUser.id ? { ...user, permissions: response.data.permissions } : user
+        prevUsers.map(users =>
+          users.user_id === selectedUser.user_id ? { ...users, permissions: selectedUser.permissions } : users
         )
       )
       setAlertInfo({ open: true, message: 'บันทึกสิทธิ์เรียบร้อยแล้ว', severity: 'success' })
@@ -243,8 +246,10 @@ const UserManagementPage = () => {
 
   // ฟังก์ชันสำหรับเปิด Dialog ยืนยันการลบ
   const handleDeleteUser = user => {
+    
     setUserToDelete(user)
     setIsDeleteDialogOpen(true)
+
   }
 
   // ฟังก์ชันสำหรับปิด Dialog ยืนยันการลบ
@@ -256,19 +261,22 @@ const UserManagementPage = () => {
   // ฟังก์ชันสำหรับลบผู้ใช้จริง
   const handleConfirmDeleteUser = async () => {
     try {
-      if (!userToDelete || !userToDelete.id) {
+
+    
+      if (!userToDelete.user_id) {
         // ตรวจสอบว่าใช้ `id` ไม่ใช่ `user_id`
         setAlertInfo({ open: true, message: 'ไม่พบ ID ของผู้ใช้', severity: 'error' })
         return
       }
 
       const response = await axios.delete('/api/user', {
-        data: { id: userToDelete.id } // ส่ง id ใน body ของคำขอ DELETE
+        data: { id: userToDelete.user_id } // ส่ง id ใน body ของคำขอ DELETE
       })
 
       if (response.status === 200) {
-        setUsers(prevUsers => prevUsers.filter(u => u.id !== userToDelete.id)) // ใช้ id
+        setUsers(prevUsers => prevUsers.filter(users => users.user_id !== userToDelete.user_id)) // ใช้ id
         setAlertInfo({ open: true, message: 'ลบผู้ใช้สำเร็จ', severity: 'success' })
+        
       }
     } catch (error) {
       setAlertInfo({ open: true, message: 'เกิดข้อผิดพลาดในการลบผู้ใช้', severity: 'error' })
@@ -308,6 +316,7 @@ const UserManagementPage = () => {
 
   // ฟังก์ชันสำหรับบันทึกรหัสผ่านใหม่
   const handleSaveNewPassword = async () => {
+    
     if (!passwordUser || !newPassword || !confirmNewPassword) {
       setAlertInfo({ open: true, message: 'กรุณากรอกข้อมูลให้ครบถ้วน', severity: 'error' })
       return
@@ -319,7 +328,7 @@ const UserManagementPage = () => {
     }
 
     try {
-      const response = await axios.patch('/api/user', { id: passwordUser.id, newPassword })
+      const response = await axios.patch('/api/user', { id: passwordUser.user_id, newPassword })
 
       if (response.status === 200) {
         setAlertInfo({ open: true, message: 'เปลี่ยนรหัสผ่านสำเร็จ', severity: 'success' })
@@ -360,12 +369,13 @@ const UserManagementPage = () => {
       return
     }
 
+    
     try {
-      const response = await axios.patch('/api/user', { id: nameUser.id, newName: newName.trim() })
+      const response = await axios.patch('/api/user', { id: nameUser.user_id, newName: newName.trim() })
 
       if (response.status === 200) {
         setUsers(prevUsers =>
-          prevUsers.map(user => (user.id === nameUser.id ? { ...user, name: newName.trim() } : user))
+          prevUsers.map(users => (users.user_id === nameUser.user_id ? { ...users, name: newName.trim() } : users))
         )
         setAlertInfo({ open: true, message: 'แก้ไขชื่อผู้ใช้สำเร็จ', severity: 'success' })
         handleCloseEditNameDialog()
@@ -494,7 +504,7 @@ const UserManagementPage = () => {
           </TableHead>
           <TableBody>
             {paginatedUsers.map((user, index) => (
-              <TableRow key={user.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+              <TableRow key={user.user_id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                 <StyledTableCell>{user.name}</StyledTableCell>
                 <StyledTableCell>{user.email}</StyledTableCell>
                 <StyledTableCell>{user.role}</StyledTableCell>
@@ -502,16 +512,16 @@ const UserManagementPage = () => {
                 <StyledTableCell>
                   <IconButton
                     aria-label='more'
-                    aria-controls={openMenu && menuUserId === user.id ? 'long-menu' : undefined}
+                    aria-controls={openMenu && menuUserId === user.userid ? 'long-menu' : undefined}
                     aria-haspopup='true'
-                    onClick={event => handleMenuOpen(event, user.id)}
+                    onClick={event => handleMenuOpen(event, user.user_id)}
                   >
                     <MoreVertIcon />
                   </IconButton>
                   <Menu
                     id='long-menu'
                     anchorEl={anchorEl}
-                    open={openMenu && menuUserId === user.id}
+                    open={openMenu && menuUserId === user.user_id}
                     onClose={handleMenuClose}
                     PaperProps={{
                       style: {
@@ -547,6 +557,7 @@ const UserManagementPage = () => {
                       {/* ใช้ Emoji หรือไอคอนอื่นแทน */}
                       แก้ไขชื่อ
                     </MenuItem>
+
                     <MenuItem
                       onClick={() => {
                         handleDeleteUser(user)
