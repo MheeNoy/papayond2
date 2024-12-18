@@ -96,6 +96,67 @@ const ReservationInformation = () => {
 
   const router = useRouter() // ใช้ useRouter จาก 'next/navigation'
 
+  // Function สำหรับดึงชื่อผู้ใช้จาก session
+  const getSessionUser = async () => {
+    const session = await getSession()
+    return session?.user?.name || 'Unknown'
+  }
+
+  // ฟังก์ชันสำหรับแสดง Snackbar
+  const showSnackbar = (message, severity) => {
+    setSnackbarMessage(message)
+    setSnackbarSeverity(severity)
+    setOpenSnackbar(true)
+  }
+
+  // ฟังก์ชันสำหรับปิด Snackbar
+  const handleSnackbarClose = () => {
+    setOpenSnackbar(false)
+  }
+
+  // ฟังก์ชัน handleSearch ถูกประกาศก่อนการใช้งาน
+  const handleSearch = async () => {
+    console.log('Searching for:', searchFilm)
+    if (!searchFilm.trim()) {
+      showSnackbar('กรุณากรอกเลขฟิล์มที่ต้องการค้นหา', 'warning')
+      return
+    }
+
+    try {
+      const uni_id = addressData.uni_id
+      if (!uni_id) {
+        showSnackbar('ไม่พบ uni_id ที่จำเป็น', 'error')
+        return
+      }
+
+      // เรียกใช้ API สำหรับการค้นหา address
+      const response = await axios.get('/api/reservation/address/search', {
+        params: { film_no: searchFilm.trim(), uni_id }
+      })
+
+      const newId = response.data.id
+
+      if (newId) {
+        // นำทางไปยัง URL ใหม่ที่มี address.id ใหม่
+        router.push(`/reservation_information?id=${newId}`)
+      } else {
+        showSnackbar('ไม่พบข้อมูลที่ต้องการ', 'error')
+      }
+    } catch (error) {
+      if (error.response) {
+        if (error.response.status === 404) {
+          showSnackbar('ไม่พบเลขฟิล์มที่ตรงกับมหาวิทยาลัยนี้', 'error')
+        } else if (error.response.status === 400) {
+          showSnackbar('พารามิเตอร์ไม่ถูกต้อง', 'error')
+        } else {
+          showSnackbar('เกิดข้อผิดพลาดในการค้นหา', 'error')
+        }
+      } else {
+        showSnackbar('เกิดข้อผิดพลาดในการค้นหา', 'error')
+      }
+    }
+  }
+
   // Function to fetch booking numbers via API
   const fetchBookingNumbers = async address_id => {
     try {
@@ -160,69 +221,147 @@ const ReservationInformation = () => {
     }
   }
 
-  useEffect(() => {
-    const fetchSelectedSetsInitial = async () => {
-      try {
-        const resservationData = JSON.parse(sessionStorage.getItem('resservationData'))
-        const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
-
-        const id = resservationData?.id
-        const booking_no = resservationData?.booking_no
-        const uni_id = selectedUniversity?.uni_id
-
-        if (!id || !uni_id || !booking_no) {
-          console.error('Missing required data from sessionStorage')
-          return
-        }
-
-        // Initial fetchSelectedSets with booking_no from sessionStorage
-        await fetchSelectedSets(booking_no)
-      } catch (error) {
-        console.error('Error fetching selected sets:', error)
-      }
+  // ฟังก์ชันสำหรับดึงข้อมูลที่อยู่การจัดส่ง
+  const fetchAddressData = useCallback(async () => {
+    if (!idFromUrl) {
+      setAddressData({})
+      setBookingResponse({})
+      setLoading(false)
+      return
     }
 
-    const fetchGroupData = async () => {
-      const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
-      const uni_id = selectedUniversity?.uni_id
-
-      if (!uni_id) return
-
-      try {
-        const response = await axios.post('/api/pricegroup', { uni_id })
-        const groupData = response.data
-
-        setSets(prevSets =>
-          prevSets.map((set, index) => {
-            const group = groupData.find(g => g.group_id === index + 1)
-            return {
-              ...set,
-              disabled: !(group && group.group_active === 1)
-            }
-          })
-        )
-      } catch (error) {
-        console.error('Error fetching group data:', error)
-      }
+    try {
+      setLoading(true)
+      const response = await axios.get(`/api/reservation/address?id=${idFromUrl}`)
+      setAddressData(response.data.addressData || {})
+      setFaculties(response.data.addressData.faculties || [])
+      setSelectedFaculty(response.data.addressData.facid || '')
+      setSearchFilm(response.data.addressData.film_no || '')
+    } catch (err) {
+      console.error('Failed to fetch data:', err)
+      setError('Failed to fetch data')
+    } finally {
+      setLoading(false)
     }
+  }, [idFromUrl])
 
-    const fetchData = async () => {
-      await fetchGroupData()
-      await fetchSelectedSetsInitial()
-    }
-
-    fetchData()
+  // ฟังก์ชันสำหรับดึงข้อมูลกลุ่มชุดและชุดที่เลือก
+  const fetchGroupAndSelectedSets = useCallback(async () => {
+    await fetchGroupData()
+    await fetchSelectedSetsInitial()
   }, [])
 
-  // เพิ่ม useEffect สำหรับการดึงชุดเมื่อ selectedBookingNo เปลี่ยนแปลง
-  useEffect(() => {
-    if (selectedBookingNo) {
-      fetchSelectedSets(selectedBookingNo)
-    } else {
-      // ถ้าไม่มีการเลือกใบจอง ให้ตั้งค่าชุดทั้งหมดเป็น disabled
-      setSets(prevSets => prevSets.map(set => ({ ...set, quantity: 0, addon1: false, addon2: false })))
+  // ฟังก์ชัน fetchGroupData
+  const fetchGroupData = async () => {
+    const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
+    const uni_id = selectedUniversity?.uni_id
+
+    if (!uni_id) return
+
+    try {
+      const response = await axios.post('/api/pricegroup', { uni_id })
+      const groupData = response.data
+
+      setSets(prevSets =>
+        prevSets.map((set, index) => {
+          const group = groupData.find(g => g.group_id === index + 1)
+          return {
+            ...set,
+            disabled: !(group && group.group_active === 1)
+          }
+        })
+      )
+    } catch (error) {
+      console.error('Error fetching group data:', error)
     }
-  }, [selectedBookingNo])
+  }
+
+  // ฟังก์ชัน fetchSelectedSetsInitial
+  const fetchSelectedSetsInitial = async () => {
+    try {
+      const resservationData = JSON.parse(sessionStorage.getItem('resservationData'))
+      const selectedUniversity = JSON.parse(sessionStorage.getItem('selectedUniversity'))
+
+      const id = resservationData?.id
+      const booking_no = resservationData?.booking_no
+      const uni_id = selectedUniversity?.uni_id
+
+      if (!id || !uni_id || !booking_no) {
+        console.error('Missing required data from sessionStorage')
+        return
+      }
+
+      // Initial fetchSelectedSets with booking_no from sessionStorage
+      await fetchSelectedSets(booking_no)
+    } catch (error) {
+      console.error('Error fetching selected sets:', error)
+    }
+  }
+
+  // ฟังก์ชันสำหรับดึง signsData แยกต่างหาก
+  const fetchSignsData = async () => {
+    try {
+      const response = await axios.get('/api/reservation/signs') // เปลี่ยน URL ให้ตรงกับ API ของคุณ
+      setSignsData(response.data.signs || [])
+    } catch (error) {
+      console.error('Error fetching signs data:', error)
+      setError('Failed to fetch signs data')
+    }
+  }
+
+  useEffect(() => {
+    fetchGroupAndSelectedSets()
+  }, [fetchGroupAndSelectedSets])
+
+  useEffect(() => {
+    fetchAddressData()
+  }, [fetchAddressData])
+
+  // ใช้ useEffect เพื่อดึง signsData เมื่อคอมโพเนนต์ถูก mount
+  useEffect(() => {
+    fetchSignsData()
+  }, [])
+
+  // เพิ่ม useEffect สำหรับการดึง bookingNumbers หลังจาก fetchData เรียบร้อย
+  useEffect(() => {
+    const getBookingNumbers = async () => {
+      try {
+        const bookingNumbersFromAPI = await fetchBookingNumbers(idFromUrl)
+        setBookingNumbers(bookingNumbersFromAPI)
+        if (bookingNumbersFromAPI.length > 0) {
+          setSelectedBookingNo(bookingNumbersFromAPI[0]) // ตั้งค่าเริ่มต้นเป็นค่าแรก
+        }
+      } catch (error) {
+        setError('Failed to fetch booking numbers')
+      }
+    }
+
+    if (idFromUrl) {
+      getBookingNumbers()
+    }
+  }, [idFromUrl])
+
+  // เมื่อ selectedBookingNo เปลี่ยนแปลง ให้เรียก API เพื่อดึง bookingResponse
+  useEffect(() => {
+    const fetchBookingResponse = async () => {
+      if (!selectedBookingNo) return
+
+      try {
+        // เรียก API เพื่อดึง bookingResponse ตาม address_id และ booking_no
+        const response = await axios.post('/api/reservation/booking', {
+          address_id: idFromUrl,
+          booking_no: selectedBookingNo
+        })
+
+        setBookingResponse(response.data[0] || {})
+      } catch (error) {
+        console.error('Failed to fetch booking data:', error)
+        setBookingResponse({})
+      }
+    }
+
+    fetchBookingResponse()
+  }, [selectedBookingNo, idFromUrl])
 
   // เพิ่มการสร้างฟังก์ชัน actionPriceGroup
   const actionPriceGroup = async (action, data) => {
@@ -319,101 +458,6 @@ const ReservationInformation = () => {
     setActiveTab(tab)
   }
 
-  const fetchData = useCallback(async () => {
-    if (!idFromUrl) {
-      setAddressData({})
-      setBookingResponse({})
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      const response = await axios.get(`/api/reservation/address?id=${idFromUrl}`)
-      setAddressData(response.data.addressData || {})
-      setSignsData(response.data.signsData || [])
-      setFaculties(response.data.addressData.faculties || [])
-      setSelectedFaculty(response.data.addressData.facid || '')
-      setSearchFilm(response.data.addressData.film_no || '')
-    } catch (err) {
-      console.error('Failed to fetch data:', err)
-      setError('Failed to fetch data')
-    } finally {
-      setLoading(false)
-    }
-  }, [idFromUrl])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  // Fetch provinces data
-  useEffect(() => {
-    const fetchProvinces = async () => {
-      try {
-        const response = await axios.get('/api/reservation/bookingaddress?type=province')
-        setProvinces(response.data)
-      } catch (error) {
-        console.error('Failed to fetch provinces:', error)
-      }
-    }
-    fetchProvinces()
-  }, [])
-
-  // Fetch amphurs based on selected province
-  useEffect(() => {
-    if (!bookingResponse.province) {
-      setAmphurs([])
-      setDistricts([])
-      setPostcodes([])
-      return
-    }
-    const fetchAmphurs = async () => {
-      try {
-        const response = await axios.get(`/api/reservation/bookingaddress?type=amphur&id=${bookingResponse.province}`)
-        setAmphurs(response.data)
-      } catch (error) {
-        console.error('Failed to fetch amphurs:', error)
-      }
-    }
-    fetchAmphurs()
-  }, [bookingResponse.province])
-
-  // Fetch districts based on selected amphur
-  useEffect(() => {
-    if (!bookingResponse.amphur) {
-      setDistricts([])
-      setPostcodes([])
-      return
-    }
-    const fetchDistricts = async () => {
-      try {
-        const response = await axios.get(`/api/reservation/bookingaddress?type=district&id=${bookingResponse.amphur}`)
-        setDistricts(response.data)
-      } catch (error) {
-        console.error('Failed to fetch districts:', error)
-      }
-    }
-    fetchDistricts()
-  }, [bookingResponse.amphur])
-
-  // Fetch postcodes based on selected district
-  useEffect(() => {
-    if (!bookingResponse.tumbol) {
-      setPostcodes([])
-      return
-    }
-    const fetchPostcodes = async () => {
-      try {
-        const response = await axios.get(`/api/reservation/bookingaddress?type=postcode&id=${bookingResponse.tumbol}`)
-        setPostcodes(response.data)
-      } catch (error) {
-        console.error('Failed to fetch postcodes:', error)
-      }
-    }
-    fetchPostcodes()
-  }, [bookingResponse.tumbol])
-
   const handleAddressChange = (field, value) => {
     setAddressData(prev => ({ ...prev, [field]: value }))
   }
@@ -428,113 +472,6 @@ const ReservationInformation = () => {
     } else {
       setBookingResponse(prev => ({ ...prev, [field]: value }))
     }
-  }
-
-  const handleSearch = async () => {
-    console.log('Searching for:', searchFilm)
-    if (!searchFilm.trim()) {
-      showSnackbar('กรุณากรอกเลขฟิล์มที่ต้องการค้นหา', 'warning')
-      return
-    }
-
-    try {
-      const uni_id = addressData.uni_id
-      if (!uni_id) {
-        showSnackbar('ไม่พบ uni_id ที่จำเป็น', 'error')
-        return
-      }
-
-      // เรียกใช้ API สำหรับการค้นหา address
-      const response = await axios.get('/api/reservation/address/search', {
-        params: { film_no: searchFilm.trim(), uni_id }
-      })
-
-      const newId = response.data.id
-
-      if (newId) {
-        // นำทางไปยัง URL ใหม่ที่มี address.id ใหม่
-        router.push(`/reservation_information?id=${newId}`)
-      } else {
-        showSnackbar('ไม่พบข้อมูลที่ต้องการ', 'error')
-      }
-    } catch (error) {
-      if (error.response) {
-        if (error.response.status === 404) {
-          showSnackbar('ไม่พบเลขฟิล์มที่ตรงกับมหาวิทยาลัยนี้', 'error')
-        } else if (error.response.status === 400) {
-          showSnackbar('พารามิเตอร์ไม่ถูกต้อง', 'error')
-        } else {
-          showSnackbar('เกิดข้อผิดพลาดในการค้นหา', 'error')
-        }
-      } else {
-        showSnackbar('เกิดข้อผิดพลาดในการค้นหา', 'error')
-      }
-    }
-  }
-
-  // เพิ่ม useEffect เพื่อดึง bookingNumbers หลังจาก fetchData เรียบร้อย
-  useEffect(() => {
-    const getBookingNumbers = async () => {
-      try {
-        const bookingNumbersFromAPI = await fetchBookingNumbers(idFromUrl)
-        setBookingNumbers(bookingNumbersFromAPI)
-        if (bookingNumbersFromAPI.length > 0) {
-          setSelectedBookingNo(bookingNumbersFromAPI[0]) // ตั้งค่าเริ่มต้นเป็นค่าแรก
-        }
-      } catch (error) {
-        setError('Failed to fetch booking numbers')
-      }
-    }
-
-    if (idFromUrl) {
-      getBookingNumbers()
-    }
-  }, [idFromUrl])
-
-  // เมื่อ selectedBookingNo เปลี่ยนแปลง ให้เรียก API เพื่อดึง bookingResponse
-  useEffect(() => {
-    const fetchBookingResponse = async () => {
-      if (!selectedBookingNo) return
-
-      try {
-        // เรียก API เพื่อดึง bookingResponse ตาม address_id และ booking_no
-        const response = await axios.post('/api/reservation/booking', {
-          address_id: idFromUrl,
-          booking_no: selectedBookingNo
-        })
-
-        setBookingResponse(response.data[0] || {})
-      } catch (error) {
-        console.error('Failed to fetch booking data:', error)
-        setBookingResponse({})
-      }
-    }
-
-    fetchBookingResponse()
-  }, [selectedBookingNo, idFromUrl])
-
-  const getSessionUser = async () => {
-    const session = await getSession()
-    return session?.user?.name || 'Unknown'
-  }
-
-  const handleSnackbarClose = () => {
-    setOpenSnackbar(false)
-  }
-
-  const showSnackbar = (message, severity) => {
-    setSnackbarMessage(message)
-    setSnackbarSeverity(severity)
-    setOpenSnackbar(true)
-  }
-
-  const handleAddNewBooking = () => {
-    setIsAddingNewBooking(true)
-  }
-
-  const handleCancelAddBooking = () => {
-    setIsAddingNewBooking(false)
-    setNewBookingNo('')
   }
 
   const handleSaveNewBooking = async () => {
@@ -563,27 +500,13 @@ const ReservationInformation = () => {
     }
   }
 
-  const handleLogData = async () => {
-    try {
-      const update_by = await getSessionUser()
-      const addressDataToSend = {
-        id: idFromUrl,
-        ...addressData,
-        update_by,
-        update_date: new Date().toISOString()
-      }
+  const handleCancelAddBooking = () => {
+    setIsAddingNewBooking(false)
+    setNewBookingNo('')
+  }
 
-      const response = await axios.post('/api/reservation/address/updateAddress', addressDataToSend)
-
-      if (response.data.success) {
-        showSnackbar('Address data saved successfully', 'success')
-      } else {
-        showSnackbar('Failed to save address data', 'error')
-      }
-    } catch (error) {
-      console.error('Error saving address data:', error)
-      showSnackbar('Error saving address data', 'error')
-    }
+  const handleAddNewBooking = () => {
+    setIsAddingNewBooking(true)
   }
 
   const handleSaveBooking = async () => {
@@ -607,6 +530,32 @@ const ReservationInformation = () => {
     } catch (error) {
       console.error('Error saving booking data:', error)
       showSnackbar('Error saving booking data:', 'error')
+    }
+  }
+
+  const handleLogData = async () => {
+    console.log('Search Film:', searchFilm) // ตรวจสอบค่า
+    try {
+      const update_by = await getSessionUser()
+      const addressDataToSend = {
+        id: idFromUrl,
+        ...addressData,
+        film_no: searchFilm,
+        update_by,
+        update_date: new Date().toISOString()
+      }
+
+      console.log('Address Data to Send:', addressDataToSend) // ตรวจสอบ payload
+      const response = await axios.post('/api/reservation/address/updateAddress', addressDataToSend)
+
+      if (response.data.success) {
+        showSnackbar('Address data saved successfully', 'success')
+      } else {
+        showSnackbar('Failed to save address data', 'error')
+      }
+    } catch (error) {
+      console.error('Error saving address data:', error)
+      showSnackbar('Error saving address data:', 'error')
     }
   }
 
