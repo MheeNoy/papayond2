@@ -123,9 +123,18 @@ const ReservationInformation = () => {
     }
 
     try {
-      const uni_id = addressData.uni_id
+      // ดึงข้อมูล selectedUniversity จาก sessionStorage
+      const selectedUniversityString = sessionStorage.getItem('selectedUniversity')
+      if (!selectedUniversityString) {
+        showSnackbar('ไม่พบข้อมูล selectedUniversity ใน session', 'error')
+        return
+      }
+
+      const selectedUniversity = JSON.parse(selectedUniversityString)
+      const uni_id = selectedUniversity.uni_id
+
       if (!uni_id) {
-        showSnackbar('ไม่พบ uni_id ที่จำเป็น', 'error')
+        showSnackbar('ไม่พบ uni_id ที่จำเป็นใน selectedUniversity', 'error')
         return
       }
 
