@@ -276,7 +276,7 @@ const RecordFilmAndReservation = () => {
       // Show success snackbar
       setSnackbar({ open: true, message: 'บันทึกรายการสำเร็จ.', severity: 'success' })
     } catch (error) {
-      console.log('uno_id', uni_id)
+      console.log('uni_id', uni_id)
       console.error('เกิดปัญหาขัดข้องในการบันทึกรายการ', error.response ? error.response.data : error.message)
       // Show error snackbar
       setSnackbar({ open: true, message: 'บันทึกรายการไม่สำเร็จ.', severity: 'error' })
