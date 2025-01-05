@@ -1,5 +1,5 @@
 // ตัวอย่างโค้ดหลังบ้านที่ปรับให้บันทึกค่า `update_by` และ `update_date`
-
+//api/reservation/address/updateAddress
 import { NextResponse } from 'next/server'
 import mysql from 'mysql2/promise'
 
