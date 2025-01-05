@@ -1,6 +1,5 @@
 // app/api/user/route.js
 import mysql from 'mysql2/promise'
-import bcrypt from 'bcrypt' // นำเข้า bcrypt
 
 // ฟังก์ชันเชื่อมต่อกับฐานข้อมูล
 const dbConnect = async () => {
