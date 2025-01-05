@@ -1,3 +1,4 @@
+//api/booking/create
 import mysql from 'mysql2/promise'
 
 // ฟังก์ชันเชื่อมต่อกับฐานข้อมูล
