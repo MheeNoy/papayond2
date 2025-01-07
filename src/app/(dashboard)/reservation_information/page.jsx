@@ -26,7 +26,11 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material'
 import { styled } from '@mui/material/styles'
 import PhotoIcon from '@mui/icons-material/Photo'
@@ -123,9 +127,18 @@ const ReservationInformation = () => {
     }
 
     try {
-      const uni_id = addressData.uni_id
+      // ดึงข้อมูล selectedUniversity จาก sessionStorage
+      const selectedUniversityString = sessionStorage.getItem('selectedUniversity')
+      if (!selectedUniversityString) {
+        showSnackbar('ไม่พบข้อมูล selectedUniversity ใน session', 'error')
+        return
+      }
+
+      const selectedUniversity = JSON.parse(selectedUniversityString)
+      const uni_id = selectedUniversity.uni_id
+
       if (!uni_id) {
-        showSnackbar('ไม่พบ uni_id ที่จำเป็น', 'error')
+        showSnackbar('ไม่พบ uni_id ที่จำเป็นใน selectedUniversity', 'error')
         return
       }
 
@@ -475,28 +488,37 @@ const ReservationInformation = () => {
   }
 
   const handleSaveNewBooking = async () => {
-    if (newBookingNo) {
-      try {
-        const response = await axios.post('/api/reservation/booking/create', {
-          address_id: idFromUrl,
-          uni_id: addressData.uni_id, // เพิ่ม uni_id จากข้อมูล addressData
-          film_no: searchFilm, // เพิ่ม film_no จากข้อมูล searchFilm
-          booking_no: newBookingNo
-        })
+    const { firstName, lastName, bookingNumber } = newBookingData
 
-        if (response.data.success) {
-          setBookingNumbers(prev => [...prev, newBookingNo])
-          setSelectedBookingNo(newBookingNo)
-          setIsAddingNewBooking(false)
-          setNewBookingNo('')
-          showSnackbar('บันทึกใบจองใหม่สำเร็จ', 'success')
-        } else {
-          showSnackbar('บันทึกใบจองใหม่ล้มเหลว', 'error')
-        }
-      } catch (error) {
-        console.error('Failed to save new booking:', error)
-        showSnackbar('เกิดข้อผิดพลาดในการบันทึกใบจองใหม่', 'error')
+    // Basic validation
+    if (!firstName.trim() || !lastName.trim() || !bookingNumber.trim()) {
+      showSnackbar('กรุณากรอกข้อมูลให้ครบถ้วน', 'warning') // "Please fill out all fields"
+      return
+    }
+
+    try {
+      // Example API call to create a new booking
+      const response = await axios.post('/api/reservation/booking/create', {
+        address_id: idFromUrl,
+        uni_id: addressData.uni_id, // Ensure uni_id is available in addressData
+        film_no: searchFilm, // Ensure searchFilm is available
+        booking_no: bookingNumber,
+        first_name: firstName,
+        last_name: lastName
+      })
+
+      if (response.data.success) {
+        // Update bookingNumbers state
+        setBookingNumbers(prev => [...prev, bookingNumber])
+        setSelectedBookingNo(bookingNumber)
+        showSnackbar('เพิ่มใบจองใหม่สำเร็จ', 'success') // "New booking added successfully"
+        handleCloseModal()
+      } else {
+        showSnackbar('เพิ่มใบจองใหม่ไม่สำเร็จ', 'error') // "Failed to add new booking"
       }
+    } catch (error) {
+      console.error('Failed to add new booking:', error)
+      showSnackbar('เกิดข้อผิดพลาดในการเพิ่มใบจองใหม่', 'error') // "An error occurred while adding the new booking"
     }
   }
 
@@ -1028,6 +1050,16 @@ const ReservationInformation = () => {
             เพิ่มเติม
           </Button>
         </Grid>
+        {/* Align the new button to the right */}
+        <Grid item sx={{ ml: 'auto' }}>
+          <Button
+            variant='outlined'
+            color='success' // Green color
+            onClick={handleOpenModal} // Open the modal
+          >
+            เพิ่มรายการใหม่
+          </Button>
+        </Grid>
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {isAddingNewBooking ? (
@@ -1073,22 +1105,104 @@ const ReservationInformation = () => {
     </Box>
   )
 
-  if (loading) {
-    return (
-      <Box display='flex' justifyContent='center' alignItems='center' minHeight='100vh'>
-        <CircularProgress />
-      </Box>
-    )
+  // Modal related state and handlers
+  const [openModal, setOpenModal] = useState(false) // Controls modal visibility
+  const [newBookingData, setNewBookingData] = useState({
+    firstName: '',
+    lastName: '',
+    bookingNumber: ''
+  }) // Stores input data from the modal
+
+  // Function to open the modal
+  const handleOpenModal = () => {
+    setOpenModal(true)
   }
 
-  if (error) {
-    return (
-      <Box display='flex' justifyContent='center' alignItems='center' minHeight='100vh'>
-        <Typography variant='h6' color='error'>
-          {error}
-        </Typography>
-      </Box>
-    )
+  // Function to close the modal
+  const handleCloseModal = () => {
+    setOpenModal(false)
+    // Optionally, reset the form data when closing
+    setNewBookingData({
+      firstName: '',
+      lastName: '',
+      bookingNumber: ''
+    })
+  }
+
+  // Function to handle form input changes
+  const handleInputChange = e => {
+    const { name, value } = e.target
+    setNewBookingData(prevData => ({
+      ...prevData,
+      [name]: value
+    }))
+  }
+
+  const handleSubmitNewBooking = async () => {
+    const { firstName, lastName, bookingNumber } = newBookingData
+
+    // การตรวจสอบข้อมูลพื้นฐาน
+    if (!firstName.trim() || !lastName.trim() || !bookingNumber.trim()) {
+      showSnackbar('กรุณากรอกข้อมูลให้ครบถ้วน', 'warning')
+      return
+    }
+
+    try {
+      // ดึงชื่อผู้ใช้จาก session เพื่อใช้เป็น update_by
+      const update_by = await getSessionUser()
+
+      // ดึง uni_id จาก sessionStorage
+      const selectedUniversityString = sessionStorage.getItem('selectedUniversity')
+      if (!selectedUniversityString) {
+        showSnackbar('ไม่พบข้อมูล selectedUniversity ใน session', 'error')
+        console.error('Missing selectedUniversity in sessionStorage')
+        return
+      }
+
+      const selectedUniversity = JSON.parse(selectedUniversityString)
+      const uni_id = selectedUniversity.uni_id
+
+      if (!uni_id) {
+        showSnackbar('ไม่พบ uni_id ใน selectedUniversity', 'error')
+        console.error('Missing uni_id in selectedUniversity data')
+        return
+      }
+
+      // เรียก API เพื่อสร้างใบจองใหม่ที่ /api/reservation/address/create
+      const response = await axios.post('/api/reservation/address/create', {
+        fname: firstName,
+        lname: lastName,
+        bookingNumber: bookingNumber,
+        uni_id: uni_id, // ใช้ uni_id จาก sessionStorage
+        update_by: update_by // เพิ่มฟิลด์ update_by
+      })
+
+      if (response.status === 201 && response.data.success) {
+        // นำทางไปยังหน้าใหม่ด้วย address.id ที่ได้จาก API
+        const newAddressId = response.data.data.id
+        showSnackbar('เพิ่มใบจองใหม่สำเร็จ', 'success')
+        handleCloseModal()
+        router.push(`/reservation_information?id=${newAddressId}`)
+        // ลบการอัปเดต bookingNumbers และ selectedBookingNo
+        // setBookingNumbers(prev => [...prev, bookingNumber])
+        // setSelectedBookingNo(bookingNumber)
+      } else {
+        showSnackbar(response.data.message || 'เพิ่มใบจองใหม่ไม่สำเร็จ', 'error')
+      }
+    } catch (error) {
+      if (error.response) {
+        if (error.response.status === 409) {
+          showSnackbar('เลขใบจองนี้มีอยู่แล้ว', 'error')
+        } else if (error.response.status === 400) {
+          showSnackbar('ข้อมูลที่ส่งมาไม่ถูกต้อง', 'error')
+        } else {
+          showSnackbar('เกิดข้อผิดพลาดในการเพิ่มใบจองใหม่', 'error')
+        }
+      } else {
+        console.error('Failed to add new booking:', error)
+        showSnackbar('เกิดข้อผิดพลาดในการเพิ่มใบจองใหม่', 'error')
+      }
+    }
   }
 
   return (
@@ -1104,11 +1218,58 @@ const ReservationInformation = () => {
           {activeTab === 'additional' && renderBookedSets()}
         </Grid>
       </Grid>
+
+      {/* Modal for adding a new booking */}
+      <Dialog open={openModal} onClose={handleCloseModal}>
+        <DialogTitle>เพิ่มใบจองใหม่</DialogTitle> {/* "Add New Booking" */}
+        <DialogContent>
+          <Box component='form' sx={{ mt: 2 }}>
+            <TextField
+              autoFocus
+              margin='dense'
+              label='ชื่อ' // "First Name"
+              name='firstName'
+              fullWidth
+              variant='outlined'
+              value={newBookingData.firstName}
+              onChange={handleInputChange}
+            />
+            <TextField
+              margin='dense'
+              label='นามสกุล' // "Last Name"
+              name='lastName'
+              fullWidth
+              variant='outlined'
+              value={newBookingData.lastName}
+              onChange={handleInputChange}
+            />
+            <TextField
+              margin='dense'
+              label='เลขใบจอง' // "Booking Number"
+              name='bookingNumber'
+              fullWidth
+              variant='outlined'
+              value={newBookingData.bookingNumber}
+              onChange={handleInputChange}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseModal} color='secondary'>
+            ยกเลิก {/* "Cancel" */}
+          </Button>
+          <Button onClick={handleSubmitNewBooking} color='primary'>
+            บันทึก {/* "Save" */}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Existing Snackbar for notifications */}
       <Snackbar
         open={openSnackbar}
-        autoHideDuration={3000} // ตั้งเวลาเป็น 3 วินาที
+        autoHideDuration={3000} // 3 seconds
         onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }} // มุมขวาบน
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }} // Top-right corner
       >
         <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
           {snackbarMessage}

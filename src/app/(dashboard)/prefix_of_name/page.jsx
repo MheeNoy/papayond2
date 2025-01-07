@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Table,
   TableBody,
@@ -18,7 +18,9 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Button
+  Button,
+  Pagination, // เพิ่ม Pagination จาก @mui/lab
+  Stack // สำหรับการจัดวาง Pagination
 } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -45,12 +47,12 @@ export default function PrefixTable() {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [newAddPrefixName, setNewAddPrefixName] = useState('')
 
-  // ดึงข้อมูลจาก API เมื่อคอมโพเนนต์ถูก mount
-  useEffect(() => {
-    fetchData()
-  }, [])
+  // States สำหรับ Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10 // จำนวนรายการต่อหน้า
 
-  const fetchData = async () => {
+  // ดึงข้อมูลจาก API เมื่อคอมโพเนนต์ถูก mount
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const response = await fetch('/api/prefix')
@@ -65,39 +67,45 @@ export default function PrefixTable() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // ฟังก์ชันแสดง Snackbar
-  const showSnackbar = (message, severity) => {
+  const showSnackbar = useCallback((message, severity) => {
     setSnackbarMessage(message)
     setSnackbarSeverity(severity)
     setSnackbarOpen(true)
-  }
+  }, [])
 
   // ฟังก์ชันปิด Snackbar
-  const handleCloseSnackbar = (event, reason) => {
+  const handleCloseSnackbar = useCallback((event, reason) => {
     if (reason === 'clickaway') {
       return
     }
     setSnackbarOpen(false)
-  }
+  }, [])
 
   // ฟังก์ชันเปิด Dialog แก้ไข
-  const handleEdit = prefix => {
+  const handleEdit = useCallback(prefix => {
     setCurrentPrefix(prefix)
-    setNewPrefixName(prefix.title) // ใช้ 'title' แทน 'name'
+    setNewPrefixName(prefix.title)
     setEditDialogOpen(true)
-  }
+  }, [])
 
   // ฟังก์ชันปิด Dialog แก้ไข
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = useCallback(() => {
     setEditDialogOpen(false)
     setCurrentPrefix(null)
     setNewPrefixName('')
-  }
+  }, [])
 
   // ฟังก์ชันบันทึกการแก้ไข
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
+    if (!currentPrefix) return
+
     try {
       const response = await fetch(`/api/prefix`, {
         // ใช้ endpoint เดียวกันกับ POST
@@ -110,7 +118,9 @@ export default function PrefixTable() {
 
       if (response.ok) {
         // อัปเดตข้อมูลใน frontend
-        setData(data.map(item => (item.id === currentPrefix.id ? { ...item, title: newPrefixName } : item)))
+        setData(prevData =>
+          prevData.map(item => (item.id === currentPrefix.id ? { ...item, title: newPrefixName } : item))
+        )
         showSnackbar('แก้ไขคำนำหน้าชื่อสำเร็จ', 'success')
         handleCloseEditDialog()
       } else {
@@ -121,16 +131,18 @@ export default function PrefixTable() {
       console.error('Error updating prefix:', error)
       showSnackbar('เกิดข้อผิดพลาดในการแก้ไขคำนำหน้าชื่อ', 'error')
     }
-  }
+  }, [currentPrefix, newPrefixName, showSnackbar, handleCloseEditDialog])
 
   // ฟังก์ชันลบ (เปิด Dialog ยืนยันการลบ)
-  const handleDelete = prefix => {
+  const handleDelete = useCallback(prefix => {
     setPrefixToDelete(prefix)
     setDeleteDialogOpen(true)
-  }
+  }, [])
 
   // ฟังก์ชันยืนยันการลบ
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = useCallback(async () => {
+    if (!prefixToDelete) return
+
     try {
       const response = await fetch(`/api/prefix`, {
         // ใช้ endpoint เดียวกันกับ POST และ PUT
@@ -141,7 +153,7 @@ export default function PrefixTable() {
         body: JSON.stringify({ id: prefixToDelete.id }) // ส่งเฉพาะ 'id'
       })
       if (response.ok) {
-        setData(data.filter(item => item.id !== prefixToDelete.id))
+        setData(prevData => prevData.filter(item => item.id !== prefixToDelete.id))
         showSnackbar('ลบคำนำหน้าชื่อสำเร็จ', 'success')
       } else {
         const errorData = await response.json()
@@ -154,21 +166,21 @@ export default function PrefixTable() {
       setDeleteDialogOpen(false)
       setPrefixToDelete(null)
     }
-  }
+  }, [prefixToDelete, showSnackbar])
 
   // ฟังก์ชันเปิด Dialog เพิ่มคำนำหน้า
-  const handleOpenAddDialog = () => {
+  const handleOpenAddDialog = useCallback(() => {
     setAddDialogOpen(true)
-  }
+  }, [])
 
   // ฟังก์ชันปิด Dialog เพิ่มคำนำหน้า
-  const handleCloseAddDialog = () => {
+  const handleCloseAddDialog = useCallback(() => {
     setAddDialogOpen(false)
     setNewAddPrefixName('')
-  }
+  }, [])
 
   // ฟังก์ชันบันทึกการเพิ่มคำนำหน้า
-  const handleSaveAdd = async () => {
+  const handleSaveAdd = useCallback(async () => {
     if (!newAddPrefixName.trim()) {
       showSnackbar('กรุณาใส่คำนำหน้าชื่อ', 'warning')
       return
@@ -185,7 +197,7 @@ export default function PrefixTable() {
 
       if (response.ok) {
         const newPrefix = await response.json()
-        setData([...data, newPrefix])
+        setData(prevData => [...prevData, newPrefix])
         showSnackbar('เพิ่มคำนำหน้าชื่อสำเร็จ', 'success')
         handleCloseAddDialog()
       } else {
@@ -196,7 +208,60 @@ export default function PrefixTable() {
       console.error('Error adding prefix:', error)
       showSnackbar('เกิดข้อผิดพลาดในการเพิ่มคำนำหน้าชื่อ', 'error')
     }
-  }
+  }, [newAddPrefixName, showSnackbar, handleCloseAddDialog])
+
+  // ใช้ useMemo เพื่อ memoize แถวของตาราง
+  const tableRows = useMemo(() => {
+    return data.map((prefix, index) => (
+      <TableRow key={prefix.id}>
+        <TableCell>{(currentPage - 1) * itemsPerPage + index + 1}</TableCell>
+        <TableCell>{prefix.title}</TableCell>
+        <TableCell>
+          <IconButton aria-label='edit' color='primary' onClick={() => handleEdit(prefix)}>
+            <EditIcon />
+          </IconButton>
+          <IconButton aria-label='delete' color='error' onClick={() => handleDelete(prefix)}>
+            <DeleteIcon />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+    ))
+  }, [data, currentPage, handleEdit, handleDelete])
+
+  // คำนวณข้อมูลที่จะแสดงในหน้าปัจจุบัน
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return data.slice(startIndex, endIndex)
+  }, [data, currentPage, itemsPerPage])
+
+  // ใช้ useMemo เพื่อ memoize แถวของตารางสำหรับหน้าแสดง
+  const paginatedTableRows = useMemo(() => {
+    return paginatedData.map((prefix, index) => (
+      <TableRow key={prefix.id}>
+        <TableCell>{(currentPage - 1) * itemsPerPage + index + 1}</TableCell>
+        <TableCell>{prefix.title}</TableCell>
+        <TableCell>
+          <IconButton aria-label='edit' color='primary' onClick={() => handleEdit(prefix)}>
+            <EditIcon />
+          </IconButton>
+          <IconButton aria-label='delete' color='error' onClick={() => handleDelete(prefix)}>
+            <DeleteIcon />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+    ))
+  }, [paginatedData, currentPage, handleEdit, handleDelete])
+
+  // คำนวณจำนวนหน้าทั้งหมด
+  const totalPages = useMemo(() => {
+    return Math.ceil(data.length / itemsPerPage)
+  }, [data.length, itemsPerPage])
+
+  // ฟังก์ชันเปลี่ยนหน้า
+  const handleChangePage = useCallback((event, value) => {
+    setCurrentPage(value)
+  }, [])
 
   if (loading) {
     return (
@@ -223,23 +288,8 @@ export default function PrefixTable() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.map((prefix, index) => (
-              <TableRow key={prefix.id}>
-                {' '}
-                {/* ใช้ 'id' แทน '_id' */}
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{prefix.title}</TableCell> {/* ใช้ 'title' แทน 'name' */}
-                <TableCell>
-                  <IconButton aria-label='edit' color='primary' onClick={() => handleEdit(prefix)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton aria-label='delete' color='error' onClick={() => handleDelete(prefix)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-            {data.length === 0 && (
+            {paginatedTableRows}
+            {paginatedData.length === 0 && (
               <TableRow>
                 <TableCell colSpan={3} align='center'>
                   ไม่มีข้อมูล
@@ -249,6 +299,13 @@ export default function PrefixTable() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <Stack spacing={2} sx={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Pagination count={totalPages} page={currentPage} onChange={handleChangePage} color='primary' />
+        </Stack>
+      )}
 
       {/* Dialog แก้ไขคำนำหน้าชื่อ */}
       <Dialog open={editDialogOpen} onClose={handleCloseEditDialog}>
