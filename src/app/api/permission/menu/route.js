@@ -22,7 +22,8 @@ export async function GET(request) {
         users.name,
         users.email,
         users.role,
-        GROUP_CONCAT(DISTINCT menu_role.menu_name) AS permissions
+        GROUP_CONCAT(DISTINCT menu_role.menu_name) AS permissions,
+        GROUP_CONCAT(DISTINCT menu_role.id) AS keymenu
       FROM
         users
       LEFT JOIN
@@ -36,6 +37,7 @@ export async function GET(request) {
     // แปลงข้อมูลให้อยู่ในรูปแบบที่เหมาะสม
     const formattedData = rows.map(user => ({
       ...user,
+      keymenu: user.keymenu ? user.keymenu.split(',') : [],
       permissions: user.permissions ? user.permissions.split(',') : []
     }))
 

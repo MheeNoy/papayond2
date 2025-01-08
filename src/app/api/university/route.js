@@ -40,10 +40,15 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const connection = await dbConnect()
+  let connection
+    
 
   try {
-    const { unino, uniname, location, uni_year } = await request.json()
+    // const { unino, uniname, location, uni_year } = await request.json()
+
+    const body = await request.json()
+    const { unino, uniname, location, uni_year}  = body
+
 
     // ตรวจสอบว่ามีข้อมูลครบถ้วน
     if (!unino || !uniname || !uni_year) {
@@ -52,14 +57,20 @@ export async function POST(request) {
         headers: { 'Content-Type': 'application/json' }
       })
     }
-
+    // เชื่อมต่อกับฐานข้อมูล
+    connection = await dbConnect()
     // เพิ่มมหาวิทยาลัยใหม่ลงในฐานข้อมูล
     const [result] = await connection.execute(
-      'INSERT INTO m_univercities (unino, uniname, location, uni_year) VALUES (?, ?, ?, ?)',
+      `INSERT INTO m_univercities (unino, uniname, location, uni_year, created_at, updated_at) 
+      VALUES (?, ?, ?,?,NOW(), NOW())`,
       [unino, uniname, location || '', uni_year]
     )
-
-    return new Response(JSON.stringify({ message: 'เพิ่มมหาวิทยาลัยสำเร็จ', id: result.insertId }), {
+    // const [result] = await connection.execute(
+    //   `INSERT INTO users (name, email, role, username, password, created_at, updated_at)
+    //    VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+    //   [name, email, 'user', username, hashedPassword] // ใช้ plainPassword แทน hashedPassword
+    // )
+    return new Response(JSON.stringify({ message: 'เพิ่มมหาวิทยาลัยสำเร็จ', id: '' }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
     })

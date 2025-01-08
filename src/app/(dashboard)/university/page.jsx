@@ -145,11 +145,13 @@ export default function Page() {
     }
 
     try {
+
+      
       const response = await axios.post('/api/university', {
-        unino,
-        uniname,
-        location,
-        uni_year
+        unino:unino,
+        uniname:uniname,
+        location:location,
+        uni_year:uni_year
       })
 
       if (response.status === 201) {

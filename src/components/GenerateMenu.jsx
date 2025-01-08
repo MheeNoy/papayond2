@@ -37,11 +37,11 @@ export const GenerateVerticalMenu = ({ menuData }) => {
         const subMenuSuffix = suffix && suffix.label ? <Chip size='small' {...suffix} /> : suffix
 
         // If it is, return a SubMenu component and call generateMenu with the current subMenuItem's children
-        return (
-          <VerticalSubMenu key={index} prefix={subMenuPrefix} suffix={subMenuSuffix} {...rest} icon={icon}>
-            {children && renderMenuItems(children)}
-          </VerticalSubMenu>
-        )
+        // return (
+        //   <VerticalSubMenu key={index} prefix={subMenuPrefix} suffix={subMenuSuffix} {...rest} icon={icon}>
+        //     {children && renderMenuItems(children)}
+        //   </VerticalSubMenu>
+        // )
       }
 
       // Localize the href

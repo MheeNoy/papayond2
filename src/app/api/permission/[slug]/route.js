@@ -16,6 +16,11 @@ export async function PUT(request, { params }) {
     const userId = parseInt(params.slug, 10)
     const { permissions } = await request.json()
 
+    //  ลบ สิทธิเก่า เพื่อ Clear ข้อมูล 
+    await connection.execute(`DELETE FROM users_role WHERE users_id = ? `, [
+      userId,
+    ])
+
     // ดึงข้อมูล menu_id ที่ตรงกับชื่อเมนูที่ได้รับมา
     const [menuRows] = await connection.execute(
       `SELECT id FROM menu_role WHERE menu_name IN (${permissions.map(() => '?').join(',')})`,

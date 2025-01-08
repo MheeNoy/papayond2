@@ -663,6 +663,8 @@ export default function SetFramePrice() {
   }
 
   const renderActionButtons = (id, type) => (
+
+    
     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
       <StyledButton variant='contained' color='primary' onClick={() => handleEdit(id, type)}>
         <SettingsIcon />

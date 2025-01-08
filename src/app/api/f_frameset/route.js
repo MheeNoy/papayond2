@@ -165,8 +165,9 @@ export async function DELETE(request) {
     const url = new URL(request.url)
     const idParam = url.searchParams.get('id')
 
+    const {id}  = await request.json();
     // ตรวจสอบพารามิเตอร์ id
-    if (!idParam) {
+    if (!id) {
       console.error('DELETE request missing id parameter')
       return new Response(JSON.stringify({ error: 'Missing id query parameter' }), {
         status: 400,
@@ -174,14 +175,14 @@ export async function DELETE(request) {
       })
     }
 
-    const id = parseInt(idParam, 10)
-    if (isNaN(id)) {
-      console.error(`Invalid id parameter: ${idParam}`)
-      return new Response(JSON.stringify({ error: 'Invalid id parameter' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    }
+    // const id = parseInt(idParam, 10)
+    // if (isNaN(id)) {
+    //   console.error(`Invalid id parameter: ${idParam}`)
+    //   return new Response(JSON.stringify({ error: 'Invalid id parameter' }), {
+    //     status: 400,
+    //     headers: { 'Content-Type': 'application/json' }
+    //   })
+    // }
 
     // ตรวจสอบว่ากรอบมีอยู่จริงหรือไม่
     const [existingRows] = await connection.execute('SELECT * FROM f_frameset WHERE id = ?', [id])

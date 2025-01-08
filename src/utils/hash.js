@@ -1,4 +1,4 @@
-// utils/hash.js
+
 import bcrypt from 'bcrypt';
 
 const SALT_ROUNDS = 16; // Adjust based on your requirements

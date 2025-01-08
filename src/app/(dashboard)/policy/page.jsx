@@ -104,6 +104,8 @@ const UserManagementPage = () => {
         const response = await axios.get('/api/permission')
         setUsers(response.data.users || [])
         setAllMenus(response.data.allMenus || [])
+
+        
       } else {
         setStatus('unauthenticated')
       }
@@ -126,12 +128,21 @@ const UserManagementPage = () => {
   }
 
   const handlePermissionChange = menuName => {
+
+    
     setSelectedUser(prevUser => {
       const newPermissions = prevUser.permissions.includes(menuName)
         ? prevUser.permissions.filter(p => p !== menuName)
         : [...prevUser.permissions, menuName]
       return { ...prevUser, permissions: newPermissions }
     })
+
+    // setSelectedUser(prevUser => {
+    //   const newPermissions = prevUser.keymenu.includes(menuName.id)
+    //     ? prevUser.keymenu.filter(p => p !== menuName.id)
+    //     : [...prevUser.keymenu, menuName.id]
+    //   return { ...prevUser, keymenu: newPermissions }
+    // })
   }
 
   const handleClickShowPassword = () => {
@@ -154,6 +165,7 @@ const UserManagementPage = () => {
   }
 
   const handleClosePermissionModal = () => {
+    
     setIsPermissionModalOpen(false)
     setSelectedUser(null)
   }
@@ -163,6 +175,7 @@ const UserManagementPage = () => {
 
     try {
 
+      
       if (!selectedUser || !selectedUser.user_id) {
         console.error('selectedUser or userId is missing')
         return
@@ -176,6 +189,9 @@ const UserManagementPage = () => {
         prevUsers.map(users =>
           users.user_id === selectedUser.user_id ? { ...users, permissions: selectedUser.permissions } : users
         )
+        // prevUsers.map(users =>
+        //   users.user_id === selectedUser.user_id ? { ...users, keymenu:selectedUser.keymenu, permissions: selectedUser.permissions } : users
+        // )
       )
       setAlertInfo({ open: true, message: 'บันทึกสิทธิ์เรียบร้อยแล้ว', severity: 'success' })
       handleClosePermissionModal()
@@ -592,6 +608,7 @@ const UserManagementPage = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
+              
                 {allMenus.map((menuName, index) => (
                   <TableRow key={index}>
                     <StyledTableCell>{menuName}</StyledTableCell>

@@ -31,36 +31,36 @@ const menuItems = [
     label: 'การทำงาน',
     icon: 'tabler-file-export',
     children: [
-      { href: '/order_list', icon: 'tabler-clipboard-list', label: 'รายการสั่งจอง', permission: 'เมนูรายการสั่งจอง' },
+      { href: '/order_list', icon: 'tabler-clipboard-list', label: 'รายการสั่งจอง', permission: '1' },
       {
         href: '/reservation_information',
         icon: 'tabler-shopping-cart',
         label: 'ข้อมูลการสั่งจอง',
-        permission: 'เมนูข้อมูลการสั่งจอง'
+        permission: '2'
       },
       {
         href: '/record_film_number_and_reservation',
         icon: 'tabler-printer',
         label: 'บันทึกเลขฟิลม์และใบจอง',
-        permission: 'เมนูบันทึกเลขฟิล์มและใบจอง'
+        permission: '3'
       },
       {
         href: '/list_of_group_photos',
         icon: 'tabler-camera',
         label: 'บันทึกรายการถ่ายภาพหมู่',
-        permission: 'เมนูบันทึกรายการภาพหมู่'
+        permission: '4'
       },
       {
         href: '/record_parcel_number',
         icon: 'tabler-package',
         label: 'บันทึกเลขพัสดุ',
-        permission: 'เมนูบันทึกเลขพัสดุ'
+        permission: '5'
       },
       {
         href: '/online_order',
         icon: 'tabler-package',
         label: 'การสั่งซื้อจากออนไลน์',
-        permission: 'การสั่งซื้อจากออนไลน์'
+        permission: '21'
       }
     ]
   },
@@ -71,25 +71,25 @@ const menuItems = [
         href: '/parcel_address',
         icon: 'tabler-smart-home',
         label: 'พิมพ์ที่อยู่พัสดุ',
-        permission: 'เมนูรายงานพิมพ์ที่อยู่พัสดุ'
+        permission: '6'
       },
       {
         href: '/group_photo_report',
         icon: 'tabler-shopping-cart-up',
         label: 'รายงานรูปหมู่สี',
-        permission: 'เมนูรายงานรูปหมู่สี'
+        permission: '7'
       },
       {
         href: '/film_number_report',
         icon: 'tabler-shopping-cart-up',
         label: 'รายงานชุดและเลขฟิลม์',
-        permission: 'รายงานชุดและเลขฟิล์ม'
+        permission: '17'
       },
       {
         href: '/parcel_number_report',
         icon: 'tabler-shopping-cart-up',
         label: 'รายงานเลขพัสดุ',
-        permission: 'รายงานการส่งพัสดุ'
+        permission: '18'
       }
     ]
   },
@@ -100,13 +100,13 @@ const menuItems = [
         href: '/university',
         icon: 'tabler-smart-home',
         label: 'รายชื่อมหาวิทยาลัย',
-        permission: 'เมนูรายชื่อมหาลัย'
+        permission: '8'
       },
       {
         href: '/prefix_of_name',
         icon: 'tabler-shopping-cart-up',
         label: 'คำนำหน้าชื่อ',
-        permission: 'เมนู Master Data'
+        permission: '9'
       }
     ]
   },
@@ -117,25 +117,25 @@ const menuItems = [
         href: '/set_the_price_frame',
         icon: 'tabler-smart-home',
         label: 'กำหนดค่ากรอบราคา',
-        permission: 'เมนูกำหนดค่ากรอบ/ราคา'
+        permission: '10'
       },
       {
         href: '/import_data',
         icon: 'tabler-shopping-cart-up',
         label: 'Import Data',
-        permission: 'เมนู Import Data'
+        permission: '11'
       },
       {
         href: '/export_data',
         icon: 'tabler-shopping-cart-up',
         label: 'Export Data',
-        permission: 'เมนู Export Data'
+        permission: '12'
       },
       {
         href: '/policy',
         icon: 'tabler-shopping-cart-up',
         label: 'ผู้ใช้งาน',
-        permission: 'เมนูผู้ใช้งาน'
+        permission: '13'
       }
     ]
   },
@@ -146,7 +146,7 @@ const menuItems = [
         href: '/available_sets',
         icon: 'tabler-smart-home',
         label: 'กำหนดชุดที่สามารถใช้ได้',
-        permission: 'เมนูกำหนดชุดที่สามารถใช้ได้'
+        permission: '14'
       }
     ]
   }
@@ -196,8 +196,9 @@ const VerticalMenu = ({ scrollMenu }) => {
           setIsLoading(true)
           const response = await axios.get('/api/permission/menu')
           const userData = response.data.find(user => user.user_id === session.user.id)
+          
           if (userData) {
-            setUserPermissions(userData.permissions || [])
+            setUserPermissions(userData.keymenu || [])
           } else {
             throw new Error('User data not found')
           }
@@ -222,19 +223,23 @@ const VerticalMenu = ({ scrollMenu }) => {
   }
 
   const renderMenuItem = item => {
-    if (!hasPermission(item.permission)) {
+    if (!hasPermission(item.keymenu)) {
       console.log('No permission for:', item.label)
       return null
     }
 
     if (item.children) {
-      const visibleChildren = item.children.filter(child => hasPermission(child.permission))
+      const visibleChildren = item.children.filter(child => hasPermission(child.keymenu))
+        // const visibleChildren = item.children
       if (visibleChildren.length === 0) {
         return null
       }
+
       return (
         <SubMenu key={item.label} className='font-bold' label={item.label}>
           {visibleChildren.map(renderMenuItem)}
+
+          
         </SubMenu>
       )
     }
@@ -258,6 +263,7 @@ const VerticalMenu = ({ scrollMenu }) => {
     return <div>Error: {error}</div>
   }
 
+  
   return (
     <ScrollWrapper {...scrollWrapperProps}>
       <Menu
