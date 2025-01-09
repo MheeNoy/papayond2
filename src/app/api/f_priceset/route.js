@@ -22,6 +22,8 @@ export async function GET(request) {
     const limit = parseInt(url.searchParams.get('limit')) || 10
     const offset = (page - 1) * limit
 
+  
+
     // Construct the SELECT query with JOINs to get the names
     let selectQuery = `
       SELECT
@@ -30,6 +32,9 @@ export async function GET(request) {
         f_frameset.framesetname AS frameName,
         f_sizeset.setsizename AS sizeName,
         f_priceset.uni_id,
+        f_priceset.colorset_id,
+        f_priceset.frameset_id,
+        f_priceset.sizeset_id,
         f_priceset.priceset_single
       FROM f_priceset
       LEFT JOIN f_colorset ON f_priceset.colorset_id = f_colorset.id
@@ -39,13 +44,14 @@ export async function GET(request) {
     const queryParams = []
 
     if (uniId) {
-      selectQuery += ' WHERE f_priceset.uni_id = ?'
+      selectQuery += ' WHERE f_priceset.uni_id = ? '
       queryParams.push(uniId)
     }
 
+    
     // เพิ่ม LIMIT และ OFFSET สำหรับ Pagination
     selectQuery += ' LIMIT ? OFFSET ?'
-    queryParams.push(limit, offset)
+    queryParams.push(limit.toString(), offset.toString())
 
     // Execute the SELECT query using pool
     const [rows] = await pool.execute(selectQuery, queryParams)
@@ -79,7 +85,7 @@ export async function GET(request) {
     )
   } catch (error) {
     console.error('Error handling GET request:', error)
-    return new Response(JSON.stringify({ error: 'Error fetching frame sets' }), {
+    return new Response(JSON.stringify({ error: error }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     })
@@ -111,6 +117,7 @@ export async function POST(request) {
       frameCategoryId,
       priceset_single,
       uni_id
+
     ])
 
     // ดึงข้อมูลที่เพิ่มใหม่พร้อมชื่อจากตารางที่เกี่ยวข้อง

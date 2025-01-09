@@ -319,7 +319,7 @@ const EditFrameCategoryModal = memo(({ open, onClose, onUpdate, categoryData, on
 ))
 
 // Edit Set Modal
-const EditSetModal = memo(({ open, onClose, onUpdate, setData, sizes, colors, categories, error }) => (
+const EditSetModal = memo(({ open, onClose, onUpdate, setData, sizes, colors, categories,onChange, error }) => (
   <Dialog open={open} onClose={onClose}>
     <DialogTitle>แก้ไขชุด</DialogTitle>
     <DialogContent>
@@ -329,7 +329,8 @@ const EditSetModal = memo(({ open, onClose, onUpdate, setData, sizes, colors, ca
           labelId='edit-size-select-label'
           value={setData.sizeId}
           label='ขนาด'
-          onChange={e => onUpdate({ sizeId: e.target.value })}
+          // onChange={e => onUpdate({ sizeId: e.target.value })}
+          onChange={e => onChange({ sizeId: e.target.value })}
         >
           {sizes.map(size => (
             <MenuItem key={size.id} value={size.id}>
@@ -349,7 +350,8 @@ const EditSetModal = memo(({ open, onClose, onUpdate, setData, sizes, colors, ca
           labelId='edit-color-select-label'
           value={setData.colorId}
           label='สี'
-          onChange={e => onUpdate({ colorId: e.target.value })}
+          // onChange={e => onUpdate({ colorId: e.target.value })}
+          onChange={e => onChange({ colorId: e.target.value })}
         >
           {colors.map(color => (
             <MenuItem key={color.id} value={color.id}>
@@ -369,7 +371,9 @@ const EditSetModal = memo(({ open, onClose, onUpdate, setData, sizes, colors, ca
           labelId='edit-category-select-label'
           value={setData.categoryId}
           label='หมวดหมู่'
-          onChange={e => onUpdate({ categoryId: e.target.value })}
+          // onChange={e => onUpdate({ categoryId: e.target.value })}
+          onChange={e => onChange({ categoryId: e.target.value })}
+          
         >
           {categories.map(category => (
             <MenuItem key={category.id} value={category.id}>
@@ -389,7 +393,8 @@ const EditSetModal = memo(({ open, onClose, onUpdate, setData, sizes, colors, ca
         type='number'
         fullWidth
         value={setData.priceset_single || ''}
-        onChange={e => onUpdate({ priceset_single: e.target.value })}
+        // onChange={e => onUpdate({ priceset_single: e.target.value })}
+        onChange={e => onChange({ priceset_single: e.target.value })}
         error={Boolean(error?.priceset_single)}
         helperText={error?.priceset_single}
       />
@@ -850,6 +855,7 @@ export default function SetFramePrice() {
         priceset_single: parseFloat(price), // ส่งราคาที่เป็นตัวเลข
         uni_id: JSON.parse(sessionStorage.getItem('selectedUniversity'))?.uni_id || ''
       })
+
       setSets(prev => [...prev, response.data.FrameSet])
       setFormData(prev => ({
         ...prev,
@@ -1037,6 +1043,7 @@ export default function SetFramePrice() {
       // Reset previous errors
       setEditSetError({})
 
+      // console.log(currentEditSet)
       const { id, sizeId, colorId, categoryId, priceset_single } = currentEditSet
 
       // Basic validation
